@@ -1,0 +1,17 @@
+*~
+.gdb_history
+GPATH
+GRTAGS
+GTAGS
+ID
+TAGS
+aclocal.m4
+autom4te.cache/
+aux/
+config.h*
+config.log
+config.status
+configure
+Makefile
+Makefile.in
+stamp-h1
