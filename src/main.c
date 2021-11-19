@@ -85,16 +85,16 @@ void deregister_input_handler(int fd)
 
 static int usage(int code)
 {
-    printf("Usage: bridged [-himnpsv] [-f FILE] [-i NAME] [-p FILE]\n"
+    printf("Usage: %s [-himnpsv] [-f FILE] [-i NAME] [-p FILE]\n"
 	   "\n"
-	   "  -f, --config=FILE        Configuration file to use, default /etc/bridged.conf\n"
+	   "  -f, --config=FILE        Configuration file to use, default /etc/%s.conf\n"
 	   "  -h, --help               Show this help text\n"
-	   "  -i, --ident=NAME         Identity for syslog, .cfg & .pid file, default: bridged\n"
+	   "  -i, --ident=NAME         Identity for syslog, .cfg & .pid file, default: %s\n"
 	   "  -l, --loglevel=LEVEL     Set log level: none, err, notice (default), info, debug\n"
 	   "  -n, --foreground         Run in foreground, do not detach from controlling terminal\n"
 	   "  -p, --pidfile=FILE       File to store process ID for signaling daemon\n"
 	   "  -s, --syslog             Log to syslog, default unless running in --foreground\n"
-	   "  -v, --version            Show bridged version\n");
+	   "  -v, --version            Show %s version\n", prognm, ident, PACKAGE_NAME, prognm);
 
     printf("\nBug report address: %-40s\n", PACKAGE_BUGREPORT);
 #ifdef PACKAGE_URL
@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
 	    return usage(0);
 
 	case 'i':	/* --ident=NAME */
-	    ident = optarg;
+	    pid_file = prognm = ident = optarg;
 	    break;
 
 	case 'l':
@@ -197,8 +197,6 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    setlinebuf(stderr);
-
     if (!foreground) {
 #ifdef TIOCNOTTY
 	int fd;
@@ -225,7 +223,8 @@ int main(int argc, char *argv[])
 	if (setsid() < 0)
 	    perror("setsid");
 #endif
-    }
+    } else
+	setlinebuf(stderr);
 
     /*
      * Setup logging
