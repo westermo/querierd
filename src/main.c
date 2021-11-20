@@ -22,7 +22,7 @@ int running = 1;
 int use_syslog = 1;
 time_t bridged_init_time;
 
-char *config_file = NULL;
+char *config_file = _PATH_BRIDGED_CONF;
 char *pid_file    = NULL;
 char *sock_file   = NULL;
 

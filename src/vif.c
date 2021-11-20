@@ -44,6 +44,36 @@ static int  send_query_timer   (vifi_t vifi, struct listaddr *g, int delay, int 
 static void group_version_cb   (void *arg);
 static int  group_version_timer(vifi_t vifi, struct listaddr *g);
 
+void config_vifs_from_file(void)
+{
+    char buf[256];
+    FILE *fp;
+
+    fp = fopen(config_file, "r");
+    if (!fp)
+	return;
+
+    while (fgets(buf, sizeof(buf), fp)) {
+	char *tok, *ptr = buf;
+
+	while ((tok = strtok(ptr, " \n"))) {
+	    struct uvif *uv;
+
+	    ptr = NULL;
+	    uv = config_find_ifname(tok);
+	    if (!uv) {
+		logit(LOG_INFO, 0, "Interface %s not available, continuing ...", tok);
+		continue;
+	    }
+
+	    uv->uv_flags &= ~VIFF_DISABLED;
+	}
+    }
+
+    fclose(fp);
+}
+
+
 /*
  * Initialize the virtual interfaces, but do not install
  * them in the kernel.  Start routing on all vifs that are
@@ -72,7 +102,7 @@ void init_vifs(void)
 	logit(LOG_ERR, errno, "UDP socket");
 #endif
     config_vifs_from_kernel();
-//    config_vifs_from_file();
+    config_vifs_from_file();
     config_vifs_correlate();
 
     /*
@@ -117,7 +147,7 @@ void init_vifs(void)
  */
 void zero_vif(struct uvif *uv, int t)
 {
-    uv->uv_flags	= 0;
+    uv->uv_flags	= VIFF_DISABLED;
     uv->uv_metric	= DEFAULT_METRIC;
     uv->uv_admetric	= 0;
     uv->uv_threshold	= DEFAULT_THRESHOLD;
