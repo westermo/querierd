@@ -7,7 +7,7 @@ AM_SILENT_RULES([yes])
 
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_HEADER([config.h])
-AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile test/Makefile])
 
 # Check for standard programs, headers, and functions
 AC_PROG_CC

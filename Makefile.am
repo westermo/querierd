@@ -1,6 +1,10 @@
 DISTCLEANFILES   = *~ DEADJOE semantic.cache *.gdb *.elf core core.* *.d
 SUBDIRS          = src
 
+if ENABLE_TEST
+SUBDIRS         += test
+endif
+
 ## Generate .deb package
 package:
 	@debuild -uc -us -B --lintian-opts --profile debian -i -I --show-overrides
