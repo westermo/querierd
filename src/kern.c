@@ -5,12 +5,6 @@
 
 #include "defs.h"
 
-#ifdef __linux__ /* Currently only available on Linux  */
-# ifndef MRT_TABLE
-#  define MRT_TABLE       (MRT_BASE + 9)
-# endif
-#endif
-
 int curttl = 0;
 
 /*
@@ -20,7 +14,6 @@ int curttl = 0;
 void k_set_rcvbuf(int bufsize, int minsize)
 {
     int delta = bufsize / 2;
-    int iter = 0;
 
     /*
      * Set the socket buffer.  If we can't set it as large as we want, search around
@@ -30,7 +23,6 @@ void k_set_rcvbuf(int bufsize, int minsize)
     if (setsockopt(igmp_socket, SOL_SOCKET, SO_RCVBUF, &bufsize, sizeof(bufsize)) < 0) {
         bufsize -= delta;
         while (1) {
-            iter++;
             if (delta > 1)
                 delta /= 2;
 
@@ -47,8 +39,6 @@ void k_set_rcvbuf(int bufsize, int minsize)
             /*NOTREACHED*/
         }
     }
-
-    logit(LOG_DEBUG, 0, "Got %d byte recv buffer size in %d iterations", bufsize, iter);
 }
 
 

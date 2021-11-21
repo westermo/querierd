@@ -81,7 +81,6 @@ void config_vifs_from_file(void)
  */
 void init_vifs(void)
 {
-    int enabled_vifs, enabled_phyints;
     struct uvif *uv;
     vifi_t vifi;
 
@@ -104,18 +103,6 @@ void init_vifs(void)
     config_vifs_from_kernel();
     config_vifs_from_file();
     config_vifs_correlate();
-
-    /*
-     * Quit if there are fewer than two enabled vifs.
-     */
-    enabled_vifs    = 0;
-    enabled_phyints = 0;
-    UVIF_FOREACH(vifi, uv) {
-	if (uv->uv_flags & VIFF_DISABLED)
-	    continue;
-
-	enabled_vifs++;
-    }
 
     UVIF_FOREACH(vifi, uv) {
 	if (uv->uv_flags & VIFF_DISABLED)
