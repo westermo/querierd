@@ -1,0 +1,56 @@
+name: Bob the Builder
+
+# Run on all branches, including all pull requests, except the 'dev'
+# branch since that's where we run Coverity Scan (limited tokens/day)
+on:
+  push:
+    branches:
+      - '**'
+      - '!dev'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build:
+    # Verify we can build on latest Ubuntu with both gcc and clang
+    name: ${{ matrix.compiler }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+      fail-fast: false
+    env:
+      MAKEFLAGS: -j3
+      CC: ${{ matrix.compiler }}
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install pkg-config libsystemd-dev ethtool tshark tree
+      - uses: actions/checkout@v2
+      - name: Configure
+        # Build in a sub-directory so we can safely set a+w on all
+        # directories.  Needed for `make check` since it runs with
+        # root dropped and wants to write .trs and .log files.
+        run: |
+          ./autogen.sh
+          ./configure --prefix= --enable-test
+      - name: Build
+        run: |
+          make V=1
+      - name: Install
+        run: |
+          DESTDIR=~/tmp make install-strip
+          tree ~/tmp
+          ldd ~/tmp/sbin/bridged
+          size ~/tmp/sbin/bridged
+          ~/tmp/sbin/bridged -h
+      - name: Test
+        run: |
+          make check || (cat test/test-suite.log; false)
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v2
+        with:
+          name: bridged-test-${{ matrix.compiler }}
+          path: test/*
