@@ -55,15 +55,15 @@ static vifi_t check_vif(struct uvif *v)
     vifi_t vifi;
 
     UVIF_FOREACH(vifi, uv) {
-	if (v->uv_flags & VIFF_DISABLED) {
-	    logit(LOG_DEBUG, 0, "Skipping %s, disabled", v->uv_name);
+	if (uv->uv_flags & VIFF_DISABLED) {
+	    logit(LOG_DEBUG, 0, "Skipping %s, disabled in configuration", uv->uv_name);
 	    return NO_VIF;
 	}
 
 	if ((v->uv_lcl_addr & uv->uv_subnetmask) == uv->uv_subnet ||
 	    (uv->uv_subnet  &  v->uv_subnetmask) ==  v->uv_subnet) {
 	    logit(LOG_WARNING, 0, "ignoring %s, same subnet as %s",
-		  v->uv_name, uv->uv_name);
+		  inet_fmt(v->uv_lcl_addr, s1, sizeof(s1)), uv->uv_name);
 	    return NO_VIF;
 	}
 
