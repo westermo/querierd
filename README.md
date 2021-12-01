@@ -42,4 +42,5 @@ is licensed under the same license as mrouted.
 
 [mrouted]: https://github.com/troglobit/mrouted/
 [pimd]:    https://github.com/troglobit/pimd/
-[pim6sdd]: https://github.com/troglobit/pim6sd/
+[pim6sd]:  https://github.com/troglobit/pim6sd/
+[GitHub]:  https://github.com/westermo/querierd/
