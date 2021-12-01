@@ -2,8 +2,8 @@
  * Parts of this program has been derived from mrouted.  It is covered
  * by the license in the accompanying file named "LICENSE".
  */
-#ifndef BRIDGED_DEFS_H_
-#define BRIDGED_DEFS_H_
+#ifndef QUERIERD_DEFS_H_
+#define QUERIERD_DEFS_H_
 
 #include "config.h"
 #include <stdio.h>
@@ -301,4 +301,4 @@ extern long long	strtonum(const char *numstr, long long minval, long long maxval
 extern int		pidfile(const char *basename);
 #endif
 
-#endif /* BRIDGED_DEFS_H_ */
+#endif /* QUERIERD_DEFS_H_ */

@@ -12,14 +12,14 @@ AM_CPPFLAGS     += -DIOCTL_OK_ON_RAW_SOCKET
 endif
 AM_CFLAGS        = -W -Wall -Wextra -Wno-unused -Wno-unused-parameter
 
-sbin_PROGRAMS    = bridged
-bridged_SOURCES  = main.c config.c			\
+sbin_PROGRAMS    = querierd
+querierd_SOURCES  = main.c config.c			\
 		   defs.h dvmrp.h			\
 		   igmp.c igmpv2.h igmpv3.h 		\
 		   inet.c kern.c log.c 			\
 		   queue.h 				\
 		   timer.c 				\
 		   vif.c vif.h
-bridged_CPPFLAGS = -DREGISTER_HANDLER $(AM_CPPFLAGS)
-bridged_LDADD    = $(LIBS) $(LIBOBJS)
+querierd_CPPFLAGS = -DREGISTER_HANDLER $(AM_CPPFLAGS)
+querierd_LDADD    = $(LIBS) $(LIBOBJS)
 

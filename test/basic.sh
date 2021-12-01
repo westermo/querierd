@@ -35,8 +35,8 @@ tshark -lni eth1 -w "/tmp/$NM/eth1.pcap" 2>/dev/null &
 echo $! >> "/tmp/$NM/PIDs"
 sleep 1
 
-print "Starting bridged ..."
-../src/bridged -f "/tmp/$NM/config" -l debug -n &
+print "Starting querierd ..."
+../src/querierd -f "/tmp/$NM/config" -l debug -n &
 echo $! >> "/tmp/$NM/PIDs"
 
 sleep 2

@@ -20,15 +20,15 @@ static int sighandled = 0;
 
 int running = 1;
 int use_syslog = 1;
-time_t bridged_init_time;
+time_t querierd_init_time;
 
-char *config_file = _PATH_BRIDGED_CONF;
+char *config_file = _PATH_QUERIERD_CONF;
 char *pid_file    = NULL;
 char *sock_file   = NULL;
 
 char *ident       = PACKAGE_NAME;
 char *prognm      = NULL;
-const char *versionstring = "bridged version " PACKAGE_VERSION;
+const char *versionstring = "querierd version " PACKAGE_VERSION;
 
 #define NHANDLERS	5
 static struct ihandler {

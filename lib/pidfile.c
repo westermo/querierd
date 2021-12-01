@@ -45,7 +45,7 @@ static pid_t pidfile_pid  = 0;
 
 static void pidfile_cleanup(void);
 
-const  char *__pidfile_path = _PATH_BRIDGED_RUNDIR;
+const  char *__pidfile_path = _PATH_QUERIERD_RUNDIR;
 const  char *__pidfile_name = NULL;
 
 int

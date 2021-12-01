@@ -2,8 +2,8 @@
  * Parts of this program has been derived from mrouted.  It is covered
  * by the license in the accompanying file named "LICENSE".
  */
-#ifndef BRIDGED_VIF_H_
-#define BRIDGED_VIF_H_
+#ifndef QUERIERD_VIF_H_
+#define QUERIERD_VIF_H_
 
 #include <stdint.h>
 #include "queue.h"
@@ -205,7 +205,7 @@ struct listaddr {
 
 #define NO_VIF		((vifi_t)MAXVIFS)  /* An invalid vif index */
 
-#endif /* BRIDGED_VIF_H_ */
+#endif /* QUERIERD_VIF_H_ */
 
 /**
  * Local Variables:
