@@ -1,3 +1,5 @@
+doc_DATA         = README.md ChangeLog.md LICENSE
+EXTRA_DIST       = README.md ChangeLog.md LICENSE
 DISTCLEANFILES   = *~ DEADJOE semantic.cache *.gdb *.elf core core.* *.d
 SUBDIRS          = src
 
