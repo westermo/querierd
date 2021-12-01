@@ -44,8 +44,8 @@ its origin, licensed under the same license as mrouted.
 [1]:             https://github.com/westermo/querierd/
 [GitHub]:        https://github.com/westermo/querierd/actions/workflows/build.yml/
 [GitHub Status]: https://github.com/westermo/querierd/actions/workflows/build.yml/badge.svg
+[License]:       http://www.openbsd.org/cgi-bin/cvsweb/src/usr.sbin/mrouted/LICENSE
+[License Badge]: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
 [mrouted]:       https://github.com/troglobit/mrouted/
 [pimd]:          https://github.com/troglobit/pimd/
 [pim6sd]:        https://github.com/troglobit/pim6sd/
-[License]:       http://www.openbsd.org/cgi-bin/cvsweb/src/usr.sbin/mrouted/LICENSE
-[License Badge]: https://img.shields.io/badge/License-BSD%203--Clau
