@@ -17,7 +17,7 @@ querierd_SOURCES  = main.c config.c			\
 		   defs.h dvmrp.h			\
 		   igmp.c igmpv2.h igmpv3.h 		\
 		   inet.c kern.c log.c 			\
-		   queue.h 				\
+		   pathnames.h queue.h 			\
 		   timer.c 				\
 		   vif.c vif.h
 querierd_CPPFLAGS = -DREGISTER_HANDLER $(AM_CPPFLAGS)
