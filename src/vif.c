@@ -105,8 +105,10 @@ void init_vifs(void)
     config_vifs_correlate();
 
     UVIF_FOREACH(vifi, uv) {
-	if (uv->uv_flags & VIFF_DISABLED)
+	if (uv->uv_flags & VIFF_DISABLED) {
+	    logit(LOG_INFO, 0, "%s is disabled; skipping", uv->uv_name);
 	    continue;
+	}
 
 	if (uv->uv_flags & VIFF_DOWN) {
 	    logit(LOG_INFO, 0, "%s is not yet up; interface #%u not in service",
@@ -114,6 +116,8 @@ void init_vifs(void)
 	    continue;
 	}
 
+	logit(LOG_DEBUG, 0, "starting %s; interface #%u now in service",
+	      uv->uv_name, vifi);
 	start_vif(uv);
     }
 
