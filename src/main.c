@@ -22,7 +22,7 @@ int running = 1;
 int use_syslog = 1;
 time_t querierd_init_time;
 
-char *config_file = _PATH_QUERIERD_CONF;
+char *config_file = NULL;
 char *pid_file    = NULL;
 char *sock_file   = NULL;
 
@@ -83,16 +83,38 @@ void deregister_input_handler(int fd)
     }
 }
 
+static int compose_paths(void)
+{
+    /* Default .conf file path: "/etc" + '/' + "pimd" + ".conf" */
+    if (!config_file) {
+	size_t len = strlen(SYSCONFDIR) + strlen(ident) + 7;
+
+	config_file = malloc(len);
+	if (!config_file) {
+	    logit(LOG_ERR, errno, "Failed allocating memory, exiting.");
+	    exit(1);
+	}
+
+	snprintf(config_file, len, _PATH_QUERIERD_CONF, ident);
+    }
+
+    /* Default is to let pidfile() API construct PID file from ident */
+    if (!pid_file)
+	pid_file = strdup(ident);
+
+    return 0;
+}
+
 static int usage(int code)
 {
     printf("Usage: %s [-himnpsv] [-f FILE] [-i NAME] [-p FILE]\n"
 	   "\n"
-	   "  -f, --config=FILE        Configuration file to use, default /etc/%s.conf\n"
+	   "  -f, --config=FILE        Configuration file to use, default ident: /etc/%s.conf\n"
 	   "  -h, --help               Show this help text\n"
 	   "  -i, --ident=NAME         Identity for syslog, .cfg & .pid file, default: %s\n"
 	   "  -l, --loglevel=LEVEL     Set log level: none, err, notice (default), info, debug\n"
 	   "  -n, --foreground         Run in foreground, do not detach from controlling terminal\n"
-	   "  -p, --pidfile=FILE       File to store process ID for signaling daemon\n"
+	   "  -p, --pidfile=FILE       File to store process ID for signaling daemon, default ident\n"
 	   "  -s, --syslog             Log to syslog, default unless running in --foreground\n"
 	   "  -v, --version            Show %s version\n", prognm, ident, PACKAGE_NAME, prognm);
 
@@ -136,20 +158,20 @@ int main(int argc, char *argv[])
 	{ NULL, 0, 0, 0 }
     };
 
-    pid_file = prognm = ident = progname(argv[0]);
+    prognm = ident = progname(argv[0]);
     while ((ch = getopt_long(argc, argv, "f:hi:l:np:su:v", long_options, NULL)) != EOF) {
 	const char *errstr = NULL;
 
 	switch (ch) {
 	case 'f':
-	    config_file = optarg;
+	    config_file = strdup(optarg);
 	    break;
 
 	case 'h':
 	    return usage(0);
 
 	case 'i':	/* --ident=NAME */
-	    pid_file = prognm = ident = optarg;
+	    ident = optarg;
 	    break;
 
 	case 'l':
@@ -232,6 +254,8 @@ int main(int argc, char *argv[])
     log_init(ident);
     logit(LOG_DEBUG, 0, "%s starting", versionstring);
 
+    compose_paths();
+
     timer_init();
     igmp_init();
 
@@ -289,6 +313,8 @@ int main(int argc, char *argv[])
     logit(LOG_NOTICE, 0, "%s exiting", versionstring);
     free(pfd);
     cleanup();
+    free(pid_file);
+    free(config_file);
 
     return 0;
 }
