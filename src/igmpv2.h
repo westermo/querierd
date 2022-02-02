@@ -6,6 +6,10 @@
 /*
  * Constants for IGMP Version 2.  Several of these, especially the
  * robustness variable, should be variables and not constants.
+ *
+ * The IGMP_LAST_MEMBER_INTERVAL_DEFAULT defines the default interval in
+ * seconds for group-specific queries, sent when the last member of a
+ * group sends leave.
  */
 #define	IGMP_ROBUSTNESS_DEFAULT			2
 #define	IGMP_QUERY_INTERVAL_DEFAULT		125
