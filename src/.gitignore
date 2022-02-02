@@ -2,3 +2,4 @@
 .deps
 .dirstamp
 querierd
+cfparse.c

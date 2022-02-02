@@ -44,35 +44,6 @@ static int  send_query_timer   (vifi_t vifi, struct listaddr *g, int delay, int 
 static void group_version_cb   (void *arg);
 static int  group_version_timer(vifi_t vifi, struct listaddr *g);
 
-void config_vifs_from_file(void)
-{
-    char buf[256];
-    FILE *fp;
-
-    fp = fopen(config_file, "r");
-    if (!fp)
-	return;
-
-    while (fgets(buf, sizeof(buf), fp)) {
-	char *tok, *ptr = buf;
-
-	while ((tok = strtok(ptr, " \n"))) {
-	    struct uvif *uv;
-
-	    ptr = NULL;
-	    uv = config_find_ifname(tok);
-	    if (!uv) {
-		logit(LOG_INFO, 0, "Interface %s not available, continuing ...", tok);
-		continue;
-	    }
-
-	    uv->uv_flags &= ~VIFF_DISABLED;
-	}
-    }
-
-    fclose(fp);
-}
-
 
 /*
  * Initialize the virtual interfaces, but do not install
@@ -289,7 +260,7 @@ static void start_vif(struct uvif *uv)
      */
     uv->uv_flags |= VIFF_QUERIER;
     logit(LOG_DEBUG, 0, "Assuming querier duties on interface %s", uv->uv_name);
-    send_query(uv, allhosts_group, IGMP_QUERY_RESPONSE_INTERVAL * IGMP_TIMER_SCALE, 0);
+    send_query(uv, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
 }
 
 /*
@@ -441,7 +412,7 @@ void query_groups(void *arg)
 	    continue;
 
 	if (uv->uv_flags & VIFF_QUERIER)
-	    send_query(uv, allhosts_group, IGMP_QUERY_RESPONSE_INTERVAL *
+	    send_query(uv, allhosts_group, igmp_response_interval *
 		       IGMP_TIMER_SCALE, 0);
     }
 }
@@ -945,7 +916,7 @@ void age_vifs(void)
     UVIF_FOREACH(vifi, uv) {
 	if (uv->uv_querier) {
 	    uv->uv_querier->al_timer += TIMER_INTERVAL;
-	    if (uv->uv_querier->al_timer > IGMP_OTHER_QUERIER_PRESENT_INTERVAL) {
+	    if (uv->uv_querier->al_timer > router_timeout) {
 		/*
 		 * The current querier has timed out.  We must become the
 		 * querier.
@@ -955,7 +926,7 @@ void age_vifs(void)
 		free(uv->uv_querier);
 		uv->uv_querier = NULL;
 		uv->uv_flags |= VIFF_QUERIER;
-		send_query(uv, allhosts_group, IGMP_QUERY_RESPONSE_INTERVAL *
+		send_query(uv, allhosts_group, igmp_response_interval *
 			   IGMP_TIMER_SCALE, 0);
 	    }
 	}

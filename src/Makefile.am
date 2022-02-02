@@ -13,7 +13,7 @@ endif
 AM_CFLAGS        = -W -Wall -Wextra -Wno-unused -Wno-unused-parameter
 
 sbin_PROGRAMS    = querierd
-querierd_SOURCES  = main.c config.c			\
+querierd_SOURCES  = main.c cfparse.y config.c		\
 		   defs.h dvmrp.h			\
 		   igmp.c igmpv2.h igmpv3.h 		\
 		   inet.c kern.c log.c 			\

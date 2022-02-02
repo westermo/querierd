@@ -2,17 +2,45 @@ Bridge Querier Helper
 =====================
 [![License Badge][]][License] [![GitHub Status][]][GitHub]
 
-This daemon is an IGMP querier helper for the Linux bridge.
+This daemon is a querier helper for the Linux bridge.  Currently only
+IGMP is supported, support for initiating MLD queries is planned.
 
 
 Configuration
 -------------
 
-By default `querierd` is passive on all interfaces.  To activate IGMPv3
-querier, add whitespace separated interface names to the .conf file.
+By default `querierd` is passive on all interfaces.  Use the following
+settings to enable and tweak the defaults.  There is no way to configure
+different IGMP/MLD settings per interface at the moment, only protocol
+version.
 
-> **Note:** this is a temporary file format, a later release will include
->           more advanced settings, without being backwards compatible!
+    multicast-query-interval [1-1024]                  # default: 125 sec
+    multicast-query-response-interval [1-1024]         # default: 10 sec
+    multicast-robustness [2-10]                        # default: 2
+    multicast-router-timeout [10-1024]                 # default: 255 sec
+    
+    iface IFNAME [enable] [igmpv1 | igmpv2 | igmpv3]   # default: disable
+
+Description:
+
+  * `multicast-query-interval`: the interval between IGMP/MLD queries,
+    when elected as querier for a LAN
+  * `multicast-robustness`: controls the tolerance to loss of replies
+    from end devices and the loss of elected queriers (above)
+  * `multicast-router-timeout`: also known as *"other querier present
+    interval"*, controls the timer used to detect when an elected
+    querier stops sending queries.  When the timer expires `querierd`
+    will initiate a query.  The default, when this is unset (commented
+    out) is calculated based on: `robustness * query-interval +
+    query-response-interval / 2`.  Setting this to any value overrides
+    the RFC algorithm, which may be necessary in some scenarios, it is
+    however strongly recommended to leave this setting commented out!
+
+> **Note:** the daemon needs an address on interfaces to operate, it is
+> expected that querierd runs on top of a bridge, and that the bridge
+> takes care of per-VLAN proxy queries.  Also, currently the daemon does
+> not react automatically to IP address changes, so it needs to be
+> SIGHUP'ed to use any new interface or address.
 
 
 Motivation

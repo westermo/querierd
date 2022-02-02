@@ -12,10 +12,10 @@
 #define	IGMP_QUERY_RESPONSE_INTERVAL		10
 #define	IGMP_GROUP_MEMBERSHIP_INTERVAL		(igmp_robustness * \
 					igmp_query_interval + \
-					IGMP_QUERY_RESPONSE_INTERVAL)
+					igmp_response_interval)
 #define	IGMP_OTHER_QUERIER_PRESENT_INTERVAL	(igmp_robustness * \
 					igmp_query_interval + \
-					IGMP_QUERY_RESPONSE_INTERVAL / 2)
+					igmp_response_interval / 2)
 						/* Round to the nearest TIMER_INTERVAL */
 #define	IGMP_STARTUP_QUERY_INTERVAL		(((igmp_query_interval / 4) \
 							/ TIMER_INTERVAL) * TIMER_INTERVAL)
