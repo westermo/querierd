@@ -514,9 +514,11 @@ void accept_membership_query(int ifi, uint32_t src, uint32_t dst, uint32_t group
 		uv->uv_querier->al_addr = src;
 	    }
 	} else {
+#if 0
 	    logit(LOG_DEBUG, 0, "Ignoring query from %s; querier on interface %u is still %s",
 		  inet_fmt(src, s1, sizeof(s1)), vifi,
 		  uv->uv_querier ? inet_fmt(uv->uv_querier->al_addr, s2, sizeof(s2)) : "me");
+#endif
 	    return;
 	}
     }

@@ -472,12 +472,12 @@ static int check_signals(void)
 
     if (sighandled & GOT_SIGUSR1) {
 	sighandled &= ~GOT_SIGUSR1;
-	logit(LOG_INFO, 0, "SIGUSR1 is no longer supported, use mroutectl instead.");
+	/* ignored for now */
     }
 
     if (sighandled & GOT_SIGUSR2) {
 	sighandled &= ~GOT_SIGUSR2;
-	logit(LOG_INFO, 0, "SIGUSR2 is no longer supported, use mroutectl instead.");
+	/* ignored for now */
     }
 
     return 0;
