@@ -25,7 +25,8 @@ ip -br a
 
 print "Creating config ..."
 cat <<EOF > "/tmp/$NM/config"
-eth0 eth1
+iface eth0 enable igmpv3
+iface eth1 enable igmpv3
 EOF
 
 print "Starting collector(s) ..."
