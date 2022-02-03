@@ -74,25 +74,6 @@ int log_list(char *buf, size_t len)
     return 0;
 }
 
-void resetlogging(void *arg)
-{
-    int nxttime = 60;
-    void *narg = NULL;
-
-    if (arg == NULL && log_nmsgs > LOG_MAX_MSGS) {
-	nxttime = LOG_SHUT_UP;
-	narg = (void *)&log_nmsgs;	/* just need some valid void * */
-	syslog(LOG_WARNING, "logging too fast, shutting up for %d minutes",
-			LOG_SHUT_UP / 60);
-    } else {
-	log_nmsgs = 0;
-    }
-
-    timer_set(nxttime, resetlogging, narg);
-}
-
-
-
 /*
  * Open connection to syslog daemon and set initial log level
  */
@@ -104,9 +85,6 @@ void log_init(char *ident)
 
     openlog(ident, LOG_PID, LOG_DAEMON);
     setlogmask(LOG_UPTO(loglevel));
-
-    /* Start up the log rate-limiter */
-    resetlogging(NULL);
 }
 
 
@@ -149,23 +127,10 @@ void logit(int severity, int syserr, const char *format, ...)
 	goto end;
     }
 
-    /*
-     * Always log things that are worse than warnings, no matter what
-     * the log_nmsgs rate limiter says.
-     * Only count things worse than debugging in the rate limiter
-     * (since if you put daemon.debug in syslog.conf you probably
-     * actually want to log the debugging messages so they shouldn't
-     * be rate-limited)
-     */
-    if ((severity < LOG_WARNING) || (log_nmsgs < LOG_MAX_MSGS)) {
-	if (severity < LOG_DEBUG)
-	    log_nmsgs++;
-	if (syserr != 0) {
-	    errno = syserr;
-	    syslog(severity, "%s: %s", msg, strerror(errno));
-	} else
-	    syslog(severity, "%s", msg);
-    }
+    if (syserr != 0)
+	syslog(severity, "%s: %s", msg, strerror(syserr));
+    else
+	syslog(severity, "%s", msg);
 
   end:
     if (severity <= LOG_ERR)
