@@ -1,5 +1,10 @@
 #!/bin/sh
-# Verifies basic querier operation on a single interface
+# Verifies basic querier operation on two interfaces
+# Checks for exactly one query from each interface,
+# i.e., triggers error for too many queries
+# TODO:
+#       - verify source address of query
+#       - verify query type/version and contents
 
 # shellcheck source=/dev/null
 . "$(dirname "$0")/lib.sh"
