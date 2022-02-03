@@ -1,5 +1,5 @@
-doc_DATA         = README.md ChangeLog.md LICENSE
-EXTRA_DIST       = README.md ChangeLog.md LICENSE
+doc_DATA         = README.md ChangeLog.md LICENSE querierd.conf
+EXTRA_DIST       = README.md ChangeLog.md LICENSE querierd.conf
 DISTCLEANFILES   = *~ DEADJOE semantic.cache *.gdb *.elf core core.* *.d
 SUBDIRS          = src
 
