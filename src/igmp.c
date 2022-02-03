@@ -267,9 +267,9 @@ void accept_igmp(int ifi, size_t recvlen)
 	return;
     }
 
-    logit(LOG_DEBUG, 0, "RECV %s from %-15s to %s",
+    logit(LOG_DEBUG, 0, "RECV %s from %-15s ifi %-2d to %s",
 	  igmp_packet_kind(igmp->igmp_type, igmp->igmp_code),
-	  inet_fmt(src, s1, sizeof(s1)), inet_fmt(dst, s2, sizeof(s2)));
+	  inet_fmt(src, s1, sizeof(s1)), ifi, inet_fmt(dst, s2, sizeof(s2)));
 
     switch (igmp->igmp_type) {
 	case IGMP_MEMBERSHIP_QUERY:
