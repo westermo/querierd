@@ -69,6 +69,7 @@ typedef void (*ihfunc_t) (int);
 #include "igmpv3.h"
 #include "vif.h"
 #include "pathnames.h"
+#include "pev.h"
 
 /*
  * Miscellaneous constants and macros.
@@ -91,8 +92,6 @@ typedef void (*ihfunc_t) (int);
 
 #define EQUAL(s1, s2)	(strcmp((s1), (s2)) == 0)
 #define ARRAY_LEN(a)    (sizeof((a)) / sizeof((a)[0]))
-
-#define TIMER_INTERVAL	2
 
 #define	DEL_RTE_GROUP	0
 #define	DEL_ALL_ROUTES	1
@@ -130,7 +129,6 @@ extern uint32_t		igmp_response_interval;
 extern uint32_t		igmp_query_interval;
 extern uint32_t		igmp_last_member_interval;
 extern uint32_t		igmp_robustness;
-extern uint32_t		virtual_time;
 
 extern int		loglevel;
 extern int		use_syslog;
@@ -207,7 +205,6 @@ extern int		mrt_table_id;
 extern int              debug_list(int, char *, size_t);
 extern int              debug_parse(char *);
 extern void             restart(void);
-extern char *		scaletime(time_t);
 extern int		register_input_handler(int, ihfunc_t);
 extern void		deregister_input_handler(int);
 
@@ -228,16 +225,6 @@ extern void		send_igmp(uint32_t, uint32_t, int, int, uint32_t, int);
 extern char *		igmp_packet_kind(uint32_t, uint32_t);
 extern int		igmp_debug_kind(uint32_t, uint32_t);
 
-/* timer.c */
-extern void		timer_init(void);
-extern void		timer_exit(void);
-extern void		timer_stop_all(void);
-extern void		timer_age_queue(time_t);
-extern int		timer_next_delay(void);
-extern int		timer_set(time_t, cfunc_t, void *);
-extern int		timer_get(int);
-extern int		timer_clear(int);
-
 /* vif.c */
 extern void		init_vifs(void);
 extern void		zero_vif(struct uvif *, int);
@@ -245,10 +232,10 @@ extern int		install_uvif(struct uvif *);
 extern void		check_vif_state(void);
 extern struct uvif     *find_uvif(vifi_t);
 extern vifi_t		find_vif(int);
-extern void		age_vifs(void);
+extern void		router_timeout_cb(int, void *);
 extern void		stop_all_vifs(void);
 extern void		accept_group_report(int, uint32_t, uint32_t, uint32_t, int);
-extern void		query_groups(void *);
+extern void		query_groups(int, void *);
 extern void		accept_leave_message(int, uint32_t, uint32_t, uint32_t);
 extern void		accept_membership_query(int, uint32_t, uint32_t, uint32_t, int, int);
 extern void             accept_membership_report(int, uint32_t, uint32_t, struct igmpv3_report *, ssize_t);

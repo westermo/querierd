@@ -161,7 +161,6 @@ struct vf_element {
 struct listaddr {
     TAILQ_ENTRY(listaddr) al_link;	/* link to next/prev addr           */
     uint32_t	     al_addr;		/* local group or neighbor address  */
-    uint32_t	     al_timer;		/* for timing out group or neighbor */
     uint32_t	     al_mtime;		/* mtime from virtual_time, for IPC */
     time_t	     al_ctime;		/* entry creation time		    */
     union {

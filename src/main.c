@@ -11,13 +11,6 @@
 #include <poll.h>
 
 int haveterminal = 1;
-
-static int sighandled = 0;
-#define	GOT_SIGINT	0x01
-#define	GOT_SIGHUP	0x02
-#define	GOT_SIGUSR1	0x04
-#define	GOT_SIGUSR2	0x08
-
 int running = 1;
 int use_syslog = 1;
 time_t querierd_init_time;
@@ -41,7 +34,7 @@ static int nhandlers = 0;
  * Forward declarations.
  */
 static void timer(void*);
-static void handle_signals(int);
+static void handle_signals(int, void *);
 static int  check_signals(void);
 static int  timeout(int);
 static void cleanup(void);
@@ -141,11 +134,6 @@ static char *progname(char *arg0)
 
 int main(int argc, char *argv[])
 {
-    FILE *fp;
-    int foreground = 0;
-    int vers, n = -1, i, ch;
-    struct pollfd *pfd;
-    struct sigaction sa;
     struct option long_options[] = {
 	{ "config",        1, 0, 'f' },
 	{ "help",          0, 0, 'h' },
@@ -157,6 +145,9 @@ int main(int argc, char *argv[])
 	{ "version",       0, 0, 'v' },
 	{ NULL, 0, 0, 0 }
     };
+    int foreground = 0;
+    int i, ch;
+    FILE *fp;
 
     prognm = ident = progname(argv[0]);
     while ((ch = getopt_long(argc, argv, "f:hi:l:np:su:v", long_options, NULL)) != EOF) {
@@ -256,162 +247,21 @@ int main(int argc, char *argv[])
 
     compose_paths();
 
-    timer_init();
+    pev_init();
     igmp_init();
-
     init_vifs();
 
-    sa.sa_handler = handle_signals;
-    sa.sa_flags = 0;	/* Interrupt system calls */
-    sigemptyset(&sa.sa_mask);
-    sigaction(SIGHUP, &sa, NULL);
-    sigaction(SIGTERM, &sa, NULL);
-    sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGUSR1, &sa, NULL);
-    sigaction(SIGUSR2, &sa, NULL);
-
-    pfd = calloc(NHANDLERS, sizeof(struct pollfd));
-    if (!pfd) {
-	logit(LOG_ERR, errno, "Failed allocating struct pollfd");
-	return 1;	/* NOTREACHED */
-    }
-
-    /* schedule first timer interrupt */
-    timer_set(TIMER_INTERVAL, timer, NULL);
+    pev_sig_add(SIGHUP,  handle_signals, NULL);
+    pev_sig_add(SIGINT,  handle_signals, NULL);
+    pev_sig_add(SIGTERM, handle_signals, NULL);
+    pev_sig_add(SIGUSR1, handle_signals, NULL);
+    pev_sig_add(SIGUSR2, handle_signals, NULL);
 
     /* Signal world we are now ready to start taking calls */
     if (pidfile(pid_file))
 	logit(LOG_WARNING, errno, "Cannot create pidfile");
 
-    /*
-     * Main receive loop.
-     */
-    while (running) {
-	for (i = 0; i < nhandlers; i++) {
-	    pfd[i].fd = ihandlers[i].fd;
-	    pfd[i].events = POLLIN;
-	}
-
-	if (check_signals())
-	    break;
-
-	n = poll(pfd, nhandlers, timeout(n) * 1000);
-	if (n < 0) {
-	    if (errno != EINTR)
-		logit(LOG_WARNING, errno, "poll failed");
-	    continue;
-	}
-
-	if (n > 0) {
-	    for (i = 0; i < nhandlers; i++) {
-		if (pfd[i].revents & POLLIN)
-		    (*ihandlers[i].func)(ihandlers[i].fd);
-	    }
-	}
-    }
-
-    logit(LOG_NOTICE, 0, "%s exiting", versionstring);
-    free(pfd);
-    cleanup();
-    free(pid_file);
-    free(config_file);
-
-    return 0;
-}
-
-/*
- * The 'virtual_time' variable is initialized to a value that will cause the
- * first invocation of timer() to send a probe or route report to all vifs
- * and send group membership queries to all subnets for which this router is
- * querier.  This first invocation occurs approximately TIMER_INTERVAL seconds
- * after the router starts up.   Note that probes for neighbors and queries
- * for group memberships are also sent at start-up time, as part of initial-
- * ization.  This repetition after a short interval is desirable for quickly
- * building up topology and membership information in the presence of possible
- * packet loss.
- *
- * 'virtual_time' advances at a rate that is only a crude approximation of
- * real time, because it does not take into account any time spent processing,
- * and because the timer intervals are sometimes shrunk by a random amount to
- * avoid unwanted synchronization with other routers.
- */
-uint32_t virtual_time = 0;
-
-
-/*
- * Timer routine.  Performs periodic neighbor probing, route reporting, and
- * group querying duties, and drives various timers in routing entries and
- * virtual interface data structures.
- */
-static void timer(void *arg)
-{
-    timer_set(TIMER_INTERVAL, timer, NULL);
-
-    age_vifs();		/* Advance the timers for neighbors */
-
-    /*
-     * Advance virtual time
-     */
-    virtual_time += TIMER_INTERVAL;
-}
-
-/*
- * Handle timeout queue.
- *
- * If poll() + packet processing took more than 1 second, or if there is
- * a timeout pending, age the timeout queue.  If not, collect usec in
- * difftime to make sure that the time doesn't drift too badly.
- *
- * XXX: If the timeout handlers took more than 1 second, age the timeout
- * queue again.  Note, this introduces the potential for infinite loops!
- */
-static int timeout(int n)
-{
-    static struct timespec difftime, curtime, lasttime;
-    static int init = 1, secs = 0;
-
-    /* Age queue */
-    do {
-	/*
-	 * If poll() timed out, then there's no other activity to
-	 * account for and we don't need to call clock_gettime().
-	 */
-	if (n == 0) {
-	    curtime.tv_sec = lasttime.tv_sec + secs;
-	    curtime.tv_nsec = lasttime.tv_nsec;
-	    n = -1; /* don't do this next time through the loop */
-	} else {
-	    clock_gettime(CLOCK_MONOTONIC, &curtime);
-	    if (init) {
-		init = 0;	/* First time only */
-		lasttime = curtime;
-		difftime.tv_nsec = 0;
-	    }
-	}
-
-	difftime.tv_sec = curtime.tv_sec - lasttime.tv_sec;
-	difftime.tv_nsec += curtime.tv_nsec - lasttime.tv_nsec;
-	while (difftime.tv_nsec > 1000000000) {
-	    difftime.tv_sec++;
-	    difftime.tv_nsec -= 1000000000;
-	}
-
-	if (difftime.tv_nsec < 0) {
-	    difftime.tv_sec--;
-	    difftime.tv_nsec += 1000000000;
-	}
-	lasttime = curtime;
-
-	if (secs == 0 || difftime.tv_sec > 0)
-	    timer_age_queue(difftime.tv_sec);
-
-	secs = -1;
-    } while (difftime.tv_sec > 0);
-
-    /* Next timer to wait for */
-    secs = timer_next_delay();
-
-    return secs;
+    return pev_run();
 }
 
 static void cleanup(void)
@@ -424,7 +274,6 @@ static void cleanup(void)
 	stop_all_vifs();
 	close(udp_socket);
 
-	timer_exit();
 	igmp_exit();
     }
 }
@@ -433,68 +282,34 @@ static void cleanup(void)
  * Signal handler.  Take note of the fact that the signal arrived
  * so that the main loop can take care of it.
  */
-static void handle_signals(int sig)
+static void handle_signals(int signo, void *arg)
 {
-    switch (sig) {
+    switch (signo) {
 	case SIGINT:
 	case SIGTERM:
-	    sighandled |= GOT_SIGINT;
+	    logit(LOG_NOTICE, 0, "%s exiting", versionstring);
+	    cleanup();
+	    free(pid_file);
+	    free(config_file);
+	    pev_exit(0);
 	    break;
 
 	case SIGHUP:
-	    sighandled |= GOT_SIGHUP;
+	    restart();
 	    break;
 
 	case SIGUSR1:
-	    sighandled |= GOT_SIGUSR1;
-	    break;
-
 	case SIGUSR2:
-	    sighandled |= GOT_SIGUSR2;
+	    /* ignored for now */
 	    break;
     }
-}
-
-static int check_signals(void)
-{
-    if (!sighandled)
-	return 0;
-
-    if (sighandled & GOT_SIGINT) {
-	sighandled &= ~GOT_SIGINT;
-	return 1;
-    }
-
-    if (sighandled & GOT_SIGHUP) {
-	sighandled &= ~GOT_SIGHUP;
-	restart();
-    }
-
-    if (sighandled & GOT_SIGUSR1) {
-	sighandled &= ~GOT_SIGUSR1;
-	/* ignored for now */
-    }
-
-    if (sighandled & GOT_SIGUSR2) {
-	sighandled &= ~GOT_SIGUSR2;
-	/* ignored for now */
-    }
-
-    return 0;
 }
 
 void restart(void)
 {
-    char *s;
-
-    s = strdup (" restart");
-    if (s == NULL)
-	logit(LOG_ERR, 0, "out of memory");
-
     /*
      * reset all the entries
      */
-    timer_stop_all();
     stop_all_vifs();
     igmp_exit();
 #ifndef IOCTL_OK_ON_RAW_SOCKET
@@ -506,28 +321,6 @@ void restart(void)
 
     /* Touch PID file to acknowledge SIGHUP */
     pidfile(pid_file);
-
-    /* schedule timer interrupts */
-    timer_set(TIMER_INTERVAL, timer, NULL);
-}
-
-#define SCALETIMEBUFLEN 27
-char *scaletime(time_t t)
-{
-    static char buf1[SCALETIMEBUFLEN];
-    static char buf2[SCALETIMEBUFLEN];
-    static char *buf = buf1;
-    char *p;
-
-    p = buf;
-    if (buf == buf1)
-	buf = buf2;
-    else
-	buf = buf1;
-
-    snprintf(p, SCALETIMEBUFLEN, "%2ld:%02ld:%02ld", t / 3600, (t % 3600) / 60, t % 60);
-
-    return p;
 }
 
 /**
