@@ -92,7 +92,7 @@ void init_vifs(void)
      */
     if (query_timerid > 0)
 	pev_timer_del(query_timerid);
-    query_timerid = pev_timer_add(1, igmp_query_interval * 1000000, query_groups, NULL);
+    query_timerid = pev_timer_add(0, igmp_query_interval * 1000000, query_groups, NULL);
 }
 
 /*
