@@ -312,9 +312,7 @@ void restart(void)
      */
     stop_all_vifs();
     igmp_exit();
-#ifndef IOCTL_OK_ON_RAW_SOCKET
     close(udp_socket);
-#endif
 
     igmp_init();
     init_vifs();

@@ -64,13 +64,7 @@ void init_vifs(void)
      * (Open a UDP socket for ioctl use in the config procedures if
      * the kernel can't handle IOCTL's on the IGMP socket.)
      */
-#ifdef IOCTL_OK_ON_RAW_SOCKET
     udp_socket = igmp_socket;
-#else
-    udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
-    if (udp_socket < 0)
-	logit(LOG_ERR, errno, "UDP socket");
-#endif
     config_vifs_from_kernel();
     config_vifs_from_file();
     config_vifs_correlate();
@@ -316,7 +310,6 @@ void stop_all_vifs(void)
 	    free(uv->uv_querier);
 	    uv->uv_querier = NULL;
 	}
-	uv->uv_querier = NULL;
 
 	TAILQ_FOREACH_SAFE(a, &uv->uv_groups, al_link, tmp) {
 	    TAILQ_REMOVE(&uv->uv_groups, a, al_link);
@@ -477,14 +470,15 @@ void accept_membership_query(int ifi, uint32_t src, uint32_t dst, uint32_t group
 
 	    if (!uv->uv_querier) {
 		uv->uv_querier = calloc(1, sizeof(struct listaddr));
+		if (!uv->uv_querier)
+		    logit(LOG_ERR, errno, "%s(): Failed allocating memory", __func__);
+
 		uv->uv_querier->al_timerid = pev_timer_add(router_timeout * 1000000, 0, router_timeout_cb, uv);
 		uv->uv_flags &= ~VIFF_QUERIER;
 	    }
 
-	    if (uv->uv_querier) {
-		time(&uv->uv_querier->al_ctime);
-		uv->uv_querier->al_addr = src;
-	    }
+	    time(&uv->uv_querier->al_ctime);
+	    uv->uv_querier->al_addr = src;
 	} else {
 #if 0
 	    logit(LOG_DEBUG, 0, "Ignoring query from %s; querier on interface %u is still %s",
