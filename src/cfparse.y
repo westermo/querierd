@@ -242,11 +242,11 @@ static struct keyword {
 	int	val1;
 	int	val2;
 } words[] = {
-	{ "multicast-query-interval", QUERY_INTERVAL, 0 },
-	{ "multicast-query-response-interval", QUERY_RESPONSE_INTERVAL, 0 },
-	{ "multicast-query-last-member-interval", QUERY_LAST_MEMBER_INTERVAL, 0 },
-	{ "multicast-robustness",    IGMP_ROBUSTNESS, 0 },
-	{ "multicast-router-timeout", ROUTER_TIMEOUT, 0 },
+	{ "query-interval",     QUERY_INTERVAL, 0 },
+	{ "query-response-interval", QUERY_RESPONSE_INTERVAL, 0 },
+	{ "query-last-member-interval", QUERY_LAST_MEMBER_INTERVAL, 0 },
+	{ "robustness",         IGMP_ROBUSTNESS, 0 },
+	{ "router-timeout",     ROUTER_TIMEOUT, 0 },
 	{ "no",                 NO, 0 },
 	{ "phyint",		PHYINT, 0 },
 	{ "iface",		PHYINT, 0 },

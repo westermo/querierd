@@ -14,12 +14,12 @@ settings to enable and tweak the defaults.  There is no way to configure
 different IGMP/MLD settings per interface at the moment, only protocol
 version.
 
-    multicast-query-interval [1-1024]                  # default: 125 sec
-    multicast-query-response-interval [1-1024]         # default: 10 sec
-    multicast-robustness [2-10]                        # default: 2
-    multicast-router-timeout [10-1024]                 # default: 255 sec
+    query-interval [1-1024]                   # default: 125 sec
+    query-response-interval [1-1024]          # default: 10 sec
+    robustness [2-10]                         # default: 2
+    router-timeout [10-1024]                  # default: 255 sec
     
-    iface IFNAME [enable] [igmpv1 | igmpv2 | igmpv3]   # default: disable
+    iface IFNAME [enable] [igmpv2 | igmpv3]   # default: disable
 
 Description:
 
