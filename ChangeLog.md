@@ -1,3 +1,28 @@
+Change Log
+==========
+
+All relevant, user visible, changes are documented in this file.
+
+
+[v0.2][] - 2022-02-04
+---------------------
+
+### Changes
+  - Add proper /etc/querierd.conf support to change:
+    - query interval (QI)
+	- query response interval (QRI)
+	- query last member interval
+	- robustness (QRV)
+    - router timeout
+	- router alert
+	- interface on/off with IGMP version
+  - Add sample querierd.conf
+
+### Fixes
+  - Ignore proxy querys, they must never win elections
+  - Query jitter problem of several seconds
+
+
 v0.1 - 2021-12-01
 -----------------
 
