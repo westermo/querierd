@@ -16,6 +16,7 @@ version.
 
     query-interval [1-1024]                   # default: 125 sec
     query-response-interval [1-1024]          # default: 10 sec
+    query-last-member-interval [1-1024]       # default: 1
     robustness [2-10]                         # default: 2
     router-timeout [10-1024]                  # default: 255 sec
     
@@ -23,15 +24,19 @@ version.
 
 Description:
 
-  * `multicast-query-interval`: the interval between IGMP/MLD queries,
-    when elected as querier for a LAN
-  * `multicast-robustness`: controls the tolerance to loss of replies
-    from end devices and the loss of elected queriers (above)
-  * `multicast-router-timeout`: also known as *"other querier present
-    interval"*, controls the timer used to detect when an elected
-    querier stops sending queries.  When the timer expires `querierd`
-    will initiate a query.  The default, when this is unset (commented
-    out) is calculated based on: `robustness * query-interval +
+  * `query-interval`: the interval between IGMP/MLD queries, when
+    elected as querier for a LAN
+  * `query-response-interval`: max response time to a query.  Can be
+    used to control the burstiness of IGMP/MLD traffic
+  * `query-last-member-interval`: time between group specific queries,
+    the `robustness` setting controls the number of queries sent
+  * `robustness`: controls the tolerance to loss of replies from end
+    devices and the loss of elected queriers (above)
+  * `router-timeout`: also known as *"other querier present interval"*,
+    controls the timer used to detect when an elected querier stops
+    sending queries.  When the timer expires `querierd` will initiate a
+    query.  The default, when this is unset (commented out) is
+    calculated based on: `robustness * query-interval +
     query-response-interval / 2`.  Setting this to any value overrides
     the RFC algorithm, which may be necessary in some scenarios, it is
     however strongly recommended to leave this setting commented out!
