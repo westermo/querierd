@@ -32,7 +32,10 @@ print "Creating config ..."
 cat <<EOF > "/tmp/$NM/config"
 iface eth0 enable igmpv3
 iface eth1 enable igmpv3
+iface eth2 enable
+iface eth3 enable
 EOF
+cat "/tmp/$NM/config"
 
 print "Starting collector(s) ..."
 tshark -lni eth0 -w "/tmp/$NM/eth0.pcap" 2>/dev/null &
@@ -42,7 +45,7 @@ echo $! >> "/tmp/$NM/PIDs"
 sleep 1
 
 print "Starting querierd ..."
-../src/querierd -f "/tmp/$NM/config" -l debug -n &
+../src/querierd -f "/tmp/$NM/config" -p "/tmp/$NM/pid" -l debug -n &
 echo $! >> "/tmp/$NM/PIDs"
 
 sleep 2
