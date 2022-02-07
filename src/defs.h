@@ -190,7 +190,7 @@ extern void		k_set_rcvbuf(int, int);
 extern void		k_hdr_include(int);
 extern void		k_set_pktinfo(int);
 extern void		k_set_ttl(int);
-extern void		k_set_if(uint32_t);
+extern void		k_set_if(int);
 extern void		k_join(uint32_t, int);
 extern void		k_leave(uint32_t, int);
 

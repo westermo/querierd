@@ -199,7 +199,7 @@ static void send_query(struct uvif *v, uint32_t dst, int code, uint32_t group)
 	  (v->uv_flags & VIFF_IGMPV2) ? "v2 " : "v3 ",
 	  v->uv_name);
 
-    send_igmp(v->uv_lcl_addr, dst, IGMP_MEMBERSHIP_QUERY,
+    send_igmp(v->uv_ifindex, v->uv_lcl_addr, dst, IGMP_MEMBERSHIP_QUERY,
 	      code, group, datalen);
 }
 

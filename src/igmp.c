@@ -417,7 +417,7 @@ size_t build_igmp(uint32_t src, uint32_t dst, int type, int code, uint32_t group
  * Then send the message from the interface with IP address 'src' to
  * destination 'dst'.
  */
-void send_igmp(uint32_t src, uint32_t dst, int type, int code, uint32_t group, int datalen)
+void send_igmp(int ifi, uint32_t src, uint32_t dst, int type, int code, uint32_t group, int datalen)
 {
     struct sockaddr_in sin;
     struct ip *ip;
@@ -433,8 +433,9 @@ void send_igmp(uint32_t src, uint32_t dst, int type, int code, uint32_t group, i
     else
        len = build_igmp(src, dst, type, code, group, datalen);
 
+    /* For all IGMP, change egress interface (we have only one socket) */
     if (IN_MULTICAST(ntohl(dst)))
-	k_set_if(src);
+	k_set_if(ifi);
 
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
