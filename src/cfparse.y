@@ -26,7 +26,6 @@ int                yyparse(void);
 static FILE *fp;
 
 static int lineno;
-static int state;
 
 static struct uvif *v;
 static struct uvif scrap;
@@ -48,7 +47,6 @@ static struct uvif scrap;
 %token <num> NUMBER
 %token <ptr> STRING
 %token <addr> ADDR GROUP
-%type  <addr> interface
 
 %start conf
 
@@ -63,15 +61,13 @@ stmts	: /* Empty */
 
 stmt	: error
 	| NO PHYINT		{ config_set_ifflag(VIFF_DISABLED); }
-	| PHYINT interface
+	| PHYINT STRING
 	{
-	    state++;
-
-	    v = config_find_ifaddr($2);
+	    v = config_find_ifname($2);
 	    if (!v) {
-		if ($2 != 0)
-		    warn("phyint %s not available, continuing ...", inet_fmt($2, s1, sizeof(s1)));
-		v = &scrap;
+		v = config_iface_add($2);
+		if (!v)
+		    v = &scrap;
 	    }
 	}
 	ifmods
@@ -140,27 +136,6 @@ ifmod	: DISABLE		{ v->uv_flags |= VIFF_DISABLED; }
 	    time(&a->al_ctime);
 
 	    TAILQ_INSERT_TAIL(&v->uv_static, a, al_link);
-	}
-	;
-
-interface: ADDR
-	{
-	    $$ = $1;
-	}
-	| STRING
-	{
-	    struct uvif *v;
-
-	    /*
-	     * Looks a little weird, but the orig. code was based around
-	     * the addresses being used to identify interfaces.
-	     */
-	    v = config_find_ifname($1);
-	    if (!v) {
-		warn("No such interface %s, skipping ...", $1);
-		$$ = 0;
-	    } else
-		$$ = v->uv_lcl_addr;
 	}
 	;
 
@@ -273,7 +248,7 @@ static int yylex(void)
 
     for (w = words; w->word; w++) {
         if (!strcmp(q, w->word))
-            return (state && w->val2) ? w->val2 : w->val1;
+            return w->val2 ? w->val2 : w->val1;
     }
 
     if (!strcmp(q,"on") || !strcmp(q,"yes")) {
@@ -325,7 +300,6 @@ void config_vifs_from_file(void)
     TAILQ_INIT(&scrap.uv_static);
     TAILQ_INIT(&scrap.uv_groups);
 
-    state = 0;
     lineno = 0;
 
     fp = fopen(config_file, "r");

@@ -74,9 +74,6 @@ extern int		running;
 extern int		haveterminal;
 extern int		did_final_init;
 
-extern vifi_t		numvifs;
-extern int		vifs_down;
-
 #define MAX_INET_BUF_LEN 19
 extern char		s1[MAX_INET_BUF_LEN];
 extern char		s2[MAX_INET_BUF_LEN];
@@ -142,17 +139,14 @@ extern void		igmp_init(void);
 extern void		igmp_exit(void);
 extern void		accept_igmp(int, size_t);
 extern size_t		build_igmp(uint32_t, uint32_t, int, int, uint32_t, int);
-extern void		send_igmp(uint32_t, uint32_t, int, int, uint32_t, int);
+extern void		send_igmp(int, uint32_t, uint32_t, int, int, uint32_t, int);
 extern char *		igmp_packet_kind(uint32_t, uint32_t);
 extern int		igmp_debug_kind(uint32_t, uint32_t);
 
 /* vif.c */
 extern void		init_vifs(void);
 extern void		zero_vif(struct uvif *);
-extern int		install_uvif(struct uvif *);
 extern void		check_vif_state(void);
-extern struct uvif     *find_uvif(vifi_t);
-extern vifi_t		find_vif(int);
 extern void		router_timeout_cb(int, void *);
 extern void		stop_all_vifs(void);
 extern void		accept_group_report(int, uint32_t, uint32_t, uint32_t, int);
@@ -163,8 +157,11 @@ extern void             accept_membership_report(int, uint32_t, uint32_t, struct
 
 /* config.c */
 extern void		config_set_ifflag(uint32_t flag);
+extern struct uvif     *config_iface_iter(int first);
+extern struct uvif     *config_iface_add(char *ifname);
 extern struct uvif     *config_find_ifname(char *nm);
 extern struct uvif     *config_find_ifaddr(in_addr_t addr);
+extern struct uvif     *config_find_iface(int ifindex);
 extern struct uvif     *config_init_tunnel(in_addr_t lcl_addr, in_addr_t rmt_addr, uint32_t flags);
 extern void		config_vifs_correlate(void);
 extern void		config_vifs_from_kernel(void);

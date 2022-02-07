@@ -6,19 +6,11 @@
 #include "defs.h"
 
 /*
- * Exported variables.
- */
-vifi_t	     numvifs;		/* number of vifs in use		    */
-int	     vifs_down;		/* 1=>some interfaces are down		    */
-
-/*
  * Private variables.
  */
-static struct uvif      *uvifs[MAXVIFS]; /* user-level virtual interfaces   */
-
 typedef struct {
     struct listaddr *g;
-    vifi_t vifi;
+    int    ifi;
     int    delay;
     int    num;
 } cbk_t;
@@ -34,13 +26,13 @@ static void stop_vif           (struct uvif *uv);
 static void send_query         (struct uvif *v, uint32_t dst, int code, uint32_t group);
 
 static void delete_group_cb    (int timeout, void *arg);
-static int  delete_group_timer (vifi_t vifi, struct listaddr *g, int tmo);
+static int  delete_group_timer (int ifi, struct listaddr *g, int tmo);
 
 static void send_query_cb      (int timeout, void *arg);
-static int  send_query_timer   (vifi_t vifi, struct listaddr *g, int delay, int num);
+static int  send_query_timer   (int ifi, struct listaddr *g, int delay, int num);
 
 static void group_version_cb   (int timeout, void *arg);
-static int  group_version_timer(vifi_t vifi, struct listaddr *g);
+static int  group_version_timer(int ifi, struct listaddr *g);
 
 
 /*
@@ -51,35 +43,23 @@ static int  group_version_timer(vifi_t vifi, struct listaddr *g);
 void init_vifs(void)
 {
     struct uvif *uv;
-    vifi_t vifi;
 
-    numvifs = 0;
-    vifs_down = 0;
-
-    /*
-     * Configure the vifs based on the interface configuration of the
-     * the kernel and the contents of the configuration file.
-     * (Open a UDP socket for ioctl use in the config procedures if
-     * the kernel can't handle IOCTL's on the IGMP socket.)
-     */
-    config_vifs_from_kernel();
     config_vifs_from_file();
+    config_vifs_from_kernel();
     config_vifs_correlate();
 
-    UVIF_FOREACH(vifi, uv) {
+    for (uv = config_iface_iter(1); uv; uv = config_iface_iter(0)) {
 	if (uv->uv_flags & VIFF_DISABLED) {
 	    logit(LOG_INFO, 0, "%s is disabled; skipping", uv->uv_name);
 	    continue;
 	}
 
 	if (uv->uv_flags & VIFF_DOWN) {
-	    logit(LOG_INFO, 0, "%s is not yet up; interface #%u not in service",
-		  uv->uv_name, vifi);
+	    logit(LOG_INFO, 0, "%s is not yet up; interface not in service", uv->uv_name);
 	    continue;
 	}
 
-	logit(LOG_DEBUG, 0, "starting %s; interface #%u now in service",
-	      uv->uv_name, vifi);
+	logit(LOG_DEBUG, 0, "starting %s; interface now in service", uv->uv_name);
 	start_vif(uv);
     }
 
@@ -113,18 +93,6 @@ void zero_vif(struct uvif *uv)
     uv->uv_addrs	= NULL;
 }
 
-int install_uvif(struct uvif *uv)
-{
-    if (numvifs == MAXVIFS) {
-	logit(LOG_WARNING, 0, "Too many interfaces, ignoring %s", uv->uv_name);
-	return 1;
-    }
-
-    uvifs[numvifs++] = uv;
-
-    return 0;
-}
-
 /*
  * See if any interfaces have changed from up state to down, or vice versa,
  * including any non-multicast-capable interfaces that are in use as local
@@ -136,14 +104,12 @@ void check_vif_state(void)
     static int checking_vifs = 0;
     struct ifreq ifr;
     struct uvif *uv;
-    vifi_t vifi;
 
     if (checking_vifs)
 	return;
 
-    vifs_down = 0;
     checking_vifs = 1;
-    UVIF_FOREACH(vifi, uv) {
+    for (uv = config_iface_iter(1); uv; uv = config_iface_iter(0)) {
 	if (uv->uv_flags & VIFF_DISABLED)
 	    continue;
 
@@ -154,20 +120,15 @@ void check_vif_state(void)
 
 	if (uv->uv_flags & VIFF_DOWN) {
 	    if (ifr.ifr_flags & IFF_UP) {
-		logit(LOG_NOTICE, 0, "%s has come up; interface #%u now in service",
-		      uv->uv_name, vifi);
+		logit(LOG_NOTICE, 0, "%s has come up; interface now in service", uv->uv_name);
 		uv->uv_flags &= ~VIFF_DOWN;
 		start_vif(uv);
-	    } else {
-		vifs_down = 1;
 	    }
 	} else {
 	    if (!(ifr.ifr_flags & IFF_UP)) {
-		logit(LOG_NOTICE, 0, "%s has gone down; interface #%u taken out of service",
-		    uv->uv_name, vifi);
+		logit(LOG_NOTICE, 0, "%s has gone down; interface out of service", uv->uv_name);
 		stop_vif(uv);
 		uv->uv_flags |= VIFF_DOWN;
-		vifs_down = 1;
 	    }
 	}
     }
@@ -203,10 +164,6 @@ static void send_query(struct uvif *v, uint32_t dst, int code, uint32_t group)
 	      code, group, datalen);
 }
 
-/*
- * Add a vifi to all the user-level data structures but don't add
- * it to the kernel yet.
- */
 static void start_vif(struct uvif *uv)
 {
     struct listaddr *a;
@@ -232,9 +189,6 @@ static void start_vif(struct uvif *uv)
     send_query(uv, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
 }
 
-/*
- * Stop routing on the specified virtual interface.
- */
 static void stop_vif(struct uvif *uv)
 {
     struct listaddr *a, *tmp;
@@ -270,11 +224,10 @@ void stop_all_vifs(void)
     struct listaddr *a, *tmp;
     struct phaddr *ph;
     struct uvif *uv;
-    vifi_t vifi;
 
     pev_timer_del(query_timerid);
 
-    UVIF_FOREACH(vifi, uv) {
+    for (uv = config_iface_iter(1); uv; uv = config_iface_iter(0)) {
 	if (uv->uv_querier) {
 	    free(uv->uv_querier);
 	    uv->uv_querier = NULL;
@@ -297,65 +250,6 @@ void stop_all_vifs(void)
 }
 
 /*
- * Find user-level vif from VIF index
- */
-struct uvif *find_uvif(vifi_t vifi)
-{
-    if (vifi >= numvifs || vifi == NO_VIF || !uvifs[vifi])
-	return NULL;
-
-    return uvifs[vifi];
-}
-
-/*
- * Find VIF from ifindex
- */
-vifi_t find_vif(int ifi)
-{
-    struct uvif *uv;
-    vifi_t vifi;
-
-    if (ifi < 0)
-	return NO_VIF;
-
-    UVIF_FOREACH(vifi, uv) {
-	if (uv->uv_ifindex == ifi)
-	    return vifi;
-    }
-
-    return NO_VIF;
-}
-
-
-/*
- * Find the virtual interface from which an incoming packet arrived,
- * based on the packet's source and destination IP addresses.
- */
-vifi_t find_vif_direct(uint32_t src, uint32_t dst)
-{
-    struct phaddr *p;
-    struct uvif *uv;
-    vifi_t vifi;
-
-    UVIF_FOREACH(vifi, uv) {
-	if (uv->uv_flags & (VIFF_DOWN|VIFF_DISABLED))
-	    continue;
-
-	if ((src & uv->uv_subnetmask) == uv->uv_subnet &&
-	    (uv->uv_subnetmask == 0xffffffff || src != uv->uv_subnetbcast))
-	    return vifi;
-
-	for (p = uv->uv_addrs; p; p = p->pa_next) {
-	    if ((src & p->pa_subnetmask) == p->pa_subnet &&
-		(p->pa_subnetmask == 0xffffffff || src != p->pa_subnetbcast))
-		return vifi;
-	}
-    }
-
-    return NO_VIF;
-}
-
-/*
  * Send group membership queries on each interface for which I am querier.
  * Note that technically, there should be a timer per interface, as the
  * dynamics of querier election can cause the "right" time to send a
@@ -367,9 +261,9 @@ vifi_t find_vif_direct(uint32_t src, uint32_t dst)
 void query_groups(int period, void *arg)
 {
     struct uvif *uv;
-    vifi_t vifi;
+    int ifi;
 
-    UVIF_FOREACH(vifi, uv) {
+    for (uv = config_iface_iter(1); uv; uv = config_iface_iter(0)) {
 	if (uv->uv_flags & (VIFF_DOWN | VIFF_DISABLED))
 	    continue;
 
@@ -387,13 +281,8 @@ void query_groups(int period, void *arg)
 void accept_membership_query(int ifi, uint32_t src, uint32_t dst, uint32_t group, int tmo, int ver)
 {
     struct uvif *uv;
-    vifi_t vifi;
 
-    vifi = find_vif(ifi);
-    if (vifi == NO_VIF)
-	vifi = find_vif_direct(src, dst);
-
-    uv = find_uvif(vifi);
+    uv = config_find_iface(ifi);
     if (!uv)
 	return;
 
@@ -409,10 +298,8 @@ void accept_membership_query(int ifi, uint32_t src, uint32_t dst, uint32_t group
 	    i >>= 1;
 
 	if (i == 1) {
-	    logit(LOG_WARNING, 0, "Received IGMPv%d report from %s on interface %u, "
-		  "which is configured for IGMPv%d",
-		  ver, inet_fmt(src, s1, sizeof(s1)), vifi,
-		  uv->uv_flags & VIFF_IGMPV1 ? 1 : 2);
+	    logit(LOG_WARNING, 0, "Received IGMPv%d report from %s on %s, configured for IGMPv%d",
+		  ver, inet_fmt(src, s1, sizeof(s1)), uv->uv_name, uv->uv_flags & VIFF_IGMPV1 ? 1 : 2);
 	}
     }
 
@@ -433,9 +320,9 @@ void accept_membership_query(int ifi, uint32_t src, uint32_t dst, uint32_t group
 	}
 
 	if (ntohl(src) < ntohl(cur)) {
-	    logit(LOG_DEBUG, 0, "New querier %s (was %s) on interface %u",
-		  inet_fmt(src, s1, sizeof(s1)),
-		  uv->uv_querier ? inet_fmt(uv->uv_querier->al_addr, s2, sizeof(s2)) : "me", vifi);
+	    logit(LOG_DEBUG, 0, "New querier %s (was %s) on %s",
+		  inet_fmt(src, s1, sizeof(s1)), uv->uv_querier
+		  ? inet_fmt(uv->uv_querier->al_addr, s2, sizeof(s2)) : "me", uv->uv_name);
 
 	    if (!uv->uv_querier) {
 		uv->uv_querier = calloc(1, sizeof(struct listaddr));
@@ -450,8 +337,8 @@ void accept_membership_query(int ifi, uint32_t src, uint32_t dst, uint32_t group
 	    uv->uv_querier->al_addr = src;
 	} else {
 #if 0
-	    logit(LOG_DEBUG, 0, "Ignoring query from %s; querier on interface %u is still %s",
-		  inet_fmt(src, s1, sizeof(s1)), vifi,
+	    logit(LOG_DEBUG, 0, "Ignoring query from %s; querier on %s is still %s",
+		  inet_fmt(src, s1, sizeof(s1)), uv->uv_name,
 		  uv->uv_querier ? inet_fmt(uv->uv_querier->al_addr, s2, sizeof(s2)) : "me");
 #endif
 	    return;
@@ -473,9 +360,9 @@ void accept_membership_query(int ifi, uint32_t src, uint32_t dst, uint32_t group
 	&& group != 0 && src != uv->uv_lcl_addr) {
 	struct listaddr *g;
 
-	logit(LOG_DEBUG, 0, "Group-specific membership query for %s from %s on interface %u, timer %d",
+	logit(LOG_DEBUG, 0, "Group-specific membership query for %s from %s on %s, timer %d",
 	      inet_fmt(group, s2, sizeof(s2)),
-	      inet_fmt(src, s1, sizeof(s1)), vifi, tmo);
+	      inet_fmt(src, s1, sizeof(s1)), uv->uv_name, tmo);
 
 	TAILQ_FOREACH(g, &uv->uv_groups, al_link) {
 	    if (group == g->al_addr && g->al_query == 0) {
@@ -486,11 +373,11 @@ void accept_membership_query(int ifi, uint32_t src, uint32_t dst, uint32_t group
 		    g->al_query = pev_timer_del(g->al_query);
 
 		/* setup a timeout to remove the group membership */
-		g->al_timerid = delete_group_timer(vifi, g, IGMP_LAST_MEMBER_QUERY_COUNT
+		g->al_timerid = delete_group_timer(uv->uv_ifindex, g, IGMP_LAST_MEMBER_QUERY_COUNT
 						   * tmo / IGMP_TIMER_SCALE);
 
-		logit(LOG_DEBUG, 0, "Timer for grp %s on interface %u set to %d",
-		      inet_fmt(group, s2, sizeof(s2)), vifi, pev_timer_get(g->al_timerid) / 1000);
+		logit(LOG_DEBUG, 0, "Timer for grp %s on %s set to %d",
+		      inet_fmt(group, s2, sizeof(s2)), uv->uv_name, pev_timer_get(g->al_timerid) / 1000);
 		break;
 	    }
 	}
@@ -510,7 +397,6 @@ void accept_group_report(int ifi, uint32_t src, uint32_t dst, uint32_t group, in
 {
     struct listaddr *g;
     struct uvif *uv;
-    vifi_t vifi;
 
     inet_fmt(src, s1, sizeof(s1));
     inet_fmt(dst, s2, sizeof(s2));
@@ -522,11 +408,7 @@ void accept_group_report(int ifi, uint32_t src, uint32_t dst, uint32_t group, in
 	return;
     }
 
-    vifi = find_vif(ifi);
-    if (vifi == NO_VIF)
-	vifi = find_vif_direct(src, dst);
-
-    uv = find_uvif(vifi);
+    uv = config_find_iface(ifi);
     if (!uv)
 	return;
 
@@ -574,7 +456,7 @@ void accept_group_report(int ifi, uint32_t src, uint32_t dst, uint32_t group, in
 	    if (g->al_timerid > 0)
 		g->al_timerid = pev_timer_del(g->al_timerid);
 
-	    g->al_timerid = delete_group_timer(vifi, g, IGMP_GROUP_MEMBERSHIP_INTERVAL);
+	    g->al_timerid = delete_group_timer(uv->uv_ifindex, g, IGMP_GROUP_MEMBERSHIP_INTERVAL);
 
 	    /*
 	     * Reset timer for switching version back every time an older
@@ -584,7 +466,7 @@ void accept_group_report(int ifi, uint32_t src, uint32_t dst, uint32_t group, in
 		if (g->al_pv_timerid)
 		    g->al_pv_timerid = pev_timer_del(g->al_pv_timerid);
 
-		g->al_pv_timerid = group_version_timer(vifi, g);
+		g->al_pv_timerid = group_version_timer(uv->uv_ifindex, g);
 	    }
 	    break;
 	}
@@ -621,14 +503,14 @@ void accept_group_report(int ifi, uint32_t src, uint32_t dst, uint32_t group, in
 	/** set a timer for expiration **/
         g->al_query	= 0;
 	g->al_reporter	= src;
-	g->al_timerid	= delete_group_timer(vifi, g, IGMP_GROUP_MEMBERSHIP_INTERVAL);
+	g->al_timerid	= delete_group_timer(uv->uv_ifindex, g, IGMP_GROUP_MEMBERSHIP_INTERVAL);
 
 	/*
 	 * Set timer for swithing version back if an older version
 	 * report is received
 	 */
 	if (g->al_pv < 3)
-	    g->al_pv_timerid = group_version_timer(vifi, g);
+	    g->al_pv_timerid = group_version_timer(uv->uv_ifindex, g);
 
 	TAILQ_INSERT_TAIL(&uv->uv_groups, g, al_link);
 	time(&g->al_ctime);
@@ -645,16 +527,11 @@ void accept_leave_message(int ifi, uint32_t src, uint32_t dst, uint32_t group)
 {
     struct listaddr *g;
     struct uvif *uv;
-    vifi_t vifi;
 
     inet_fmt(src, s1, sizeof(s1));
     inet_fmt(group, s3, sizeof(s3));
 
-    vifi = find_vif(ifi);
-    if (vifi == NO_VIF)
-	vifi = find_vif_direct(src, dst);
-
-    uv = find_uvif(vifi);
+    uv = config_find_iface(ifi);
     if (!uv)
 	return;
 
@@ -699,9 +576,9 @@ void accept_leave_message(int ifi, uint32_t src, uint32_t dst, uint32_t group)
 	    g->al_timerid = pev_timer_del(g->al_timerid);
 
 	/** send a group specific query **/
-	g->al_query = send_query_timer(vifi, g, igmp_last_member_interval,
+	g->al_query = send_query_timer(uv->uv_ifindex, g, igmp_last_member_interval,
 				       IGMP_LAST_MEMBER_QUERY_COUNT);
-	g->al_timerid = delete_group_timer(vifi, g, igmp_last_member_interval
+	g->al_timerid = delete_group_timer(uv->uv_ifindex, g, igmp_last_member_interval
 					   * (IGMP_LAST_MEMBER_QUERY_COUNT + 1));
 
 	logit(LOG_DEBUG, 0, "Accepted group leave for %s on %s", s3, s1);
@@ -885,10 +762,9 @@ void router_timeout_cb(int timeout, void *arg)
 static void group_version_cb(int timeout, void *arg)
 {
     cbk_t *cbk = (cbk_t *)arg;
-    vifi_t vifi = cbk->vifi;
     struct uvif *uv;
 
-    uv = find_uvif(vifi);
+    uv = config_find_iface(cbk->ifi);
     if (!uv)
 	return;
 
@@ -909,7 +785,7 @@ static void group_version_cb(int timeout, void *arg)
 /*
  * Set a timer to switch version back on a vif.
  */
-static int group_version_timer(vifi_t vifi, struct listaddr *g)
+static int group_version_timer(int ifi, struct listaddr *g)
 {
     cbk_t *cbk;
 
@@ -919,8 +795,8 @@ static int group_version_timer(vifi_t vifi, struct listaddr *g)
 	return -1;
     }
 
-    cbk->vifi = vifi;
-    cbk->g = g;
+    cbk->ifi = ifi;
+    cbk->g   = g;
 
     return pev_timer_add(IGMP_GROUP_MEMBERSHIP_INTERVAL * 1000000, 0, group_version_cb, cbk);
 }
@@ -932,10 +808,9 @@ static void delete_group_cb(int timeout, void *arg)
 {
     cbk_t *cbk = (cbk_t *)arg;
     struct listaddr *g = cbk->g;
-    vifi_t vifi = cbk->vifi;
     struct uvif *uv;
 
-    uv = find_uvif(vifi);
+    uv = config_find_iface(cbk->ifi);
     if (!uv)
 	goto done;
 
@@ -959,7 +834,7 @@ static void delete_group_cb(int timeout, void *arg)
 /*
  * Set a timer to delete the record of a group membership on a vif.
  */
-static int delete_group_timer(vifi_t vifi, struct listaddr *g, int tmo)
+static int delete_group_timer(int ifi, struct listaddr *g, int tmo)
 {
     cbk_t *cbk;
 
@@ -969,8 +844,8 @@ static int delete_group_timer(vifi_t vifi, struct listaddr *g, int tmo)
 	return -1;
     }
 
-    cbk->g    = g;
-    cbk->vifi = vifi;
+    cbk->g = g;
+    cbk->ifi = ifi;
 
     /* Record mtime for IPC "show igmp" */
 //    g->al_mtime = virtual_time;
@@ -986,7 +861,7 @@ static void send_query_cb(int timeout, void *arg)
     cbk_t *cbk = (cbk_t *)arg;
     struct uvif *uv;
 
-    uv = find_uvif(cbk->vifi);
+    uv = config_find_iface(cbk->ifi);
     if (!uv)
 	goto end;
 
@@ -1005,7 +880,7 @@ static void send_query_cb(int timeout, void *arg)
 /*
  * Set a timer to send a group-specific query.
  */
-static int send_query_timer(vifi_t vifi, struct listaddr *g, int delay, int num)
+static int send_query_timer(int ifi, struct listaddr *g, int delay, int num)
 {
     cbk_t *cbk;
 
@@ -1015,7 +890,7 @@ static int send_query_timer(vifi_t vifi, struct listaddr *g, int delay, int num)
 	return -1;
     }
 
-    cbk->vifi  = vifi;
+    cbk->ifi   = ifi;
     cbk->g     = g;
     cbk->delay = delay;
     cbk->num   = num;
