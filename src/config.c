@@ -177,7 +177,7 @@ void config_vifs_from_kernel(void)
             return;
         }
 
-	zero_vif(uv, 0);
+	zero_vif(uv);
 
 	strlcpy(uv->uv_name, ifa->ifa_name, sizeof(uv->uv_name));
 	uv->uv_lcl_addr    = addr;

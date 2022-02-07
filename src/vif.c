@@ -101,16 +101,10 @@ void init_vifs(void)
  *
  * Note: remember to re-init all relevant TAILQ's in init_vifs()!
  */
-void zero_vif(struct uvif *uv, int t)
+void zero_vif(struct uvif *uv)
 {
     uv->uv_flags	= VIFF_DISABLED;
-    uv->uv_metric	= DEFAULT_METRIC;
-    uv->uv_admetric	= 0;
-    uv->uv_threshold	= DEFAULT_THRESHOLD;
-    uv->uv_rate_limit	= t ? DEFAULT_TUN_RATE_LIMIT : DEFAULT_PHY_RATE_LIMIT;
     uv->uv_lcl_addr	= 0;
-    uv->uv_rmt_addr	= 0;
-    uv->uv_dst_addr	= t ? 0 : dvmrp_group;
     uv->uv_subnet	= 0;
     uv->uv_subnetmask	= 0;
     uv->uv_subnetbcast	= 0;
@@ -120,10 +114,6 @@ void zero_vif(struct uvif *uv, int t)
     uv->uv_querier	= NULL;
     uv->uv_igmpv1_warn	= 0;
     uv->uv_addrs	= NULL;
-    uv->uv_filter	= NULL;
-    uv->uv_nbrup	= 0;
-    uv->uv_icmp_warn	= 0;
-    uv->uv_nroutes	= 0;
 }
 
 int install_uvif(struct uvif *uv)
@@ -229,15 +219,6 @@ static void start_vif(struct uvif *uv)
     src = uv->uv_lcl_addr;
 
     /*
-     * Join the DVMRP multicast group on the interface.
-     * (This is not strictly necessary, since the kernel promiscuously
-     * receives IGMP packets addressed to ANY IP multicast group while
-     * multicast routing is enabled.  However, joining the group allows
-     * this host to receive non-IGMP packets as well, such as 'pings'.)
-     */
-    k_join(dvmrp_group, src);
-
-    /*
      * Join the ALL-ROUTERS multicast group on the interface.
      * This allows mtrace requests to loop back if they are run
      * on the multicast router.
@@ -272,12 +253,6 @@ static void stop_vif(struct uvif *uv)
 	TAILQ_REMOVE(&uv->uv_groups, a, al_link);
 	free(a);
     }
-
-    /*
-     * Depart from the DVMRP multicast group on the interface.
-     */
-    k_leave(dvmrp_group, uv->uv_lcl_addr);
-
     /*
      * Depart from the ALL-ROUTERS multicast group on the interface.
      */

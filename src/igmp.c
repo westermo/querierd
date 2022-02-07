@@ -29,8 +29,6 @@ uint32_t	igmp_robustness;	     /* Default: 2                  */
 uint32_t	allhosts_group;		     /* All hosts addr in net order */
 uint32_t	allrtrs_group;		     /* All-Routers "  in net order */
 uint32_t	allreports_group;	     /* IGMPv3 member reports       */
-uint32_t	dvmrp_group;		     /* DVMRP grp addr in net order */
-uint32_t	dvmrp_genid;		     /* IGMP generation id          */
 
 /*
  * Private variables.
@@ -41,7 +39,6 @@ static int	igmp_sockid;
  * Local function definitions.
  */
 static void	igmp_read(int sd, void *arg);
-static int	igmp_log_level(uint32_t type, uint32_t code);
 
 /*
  * Open and initialize the igmp socket, and fill in the non-changing
@@ -68,7 +65,6 @@ void igmp_init(void)
     k_set_pktinfo(TRUE);	/* ifindex in aux data on receive */
     k_set_rcvbuf(256*1024,48*1024);	/* lots of input buffering        */
     k_set_ttl(1);		/* restrict multicasts to one hop */
-    k_set_loop(FALSE);		/* disable multicast loopback     */
 
     /*
      * Fields zeroed that aren't filled in later:
@@ -94,7 +90,6 @@ void igmp_init(void)
     ip_opt[3] = 0;
 
     allhosts_group   = htonl(INADDR_ALLHOSTS_GROUP);
-    dvmrp_group      = htonl(INADDR_DVMRP_GROUP);
     allrtrs_group    = htonl(INADDR_ALLRTRS_GROUP);
     allreports_group = htonl(INADDR_ALLRPTS_GROUP);
 
@@ -128,42 +123,9 @@ char *igmp_packet_kind(uint32_t type, uint32_t code)
 	case IGMP_V2_MEMBERSHIP_REPORT:		return "v2 member report  ";
 	case IGMP_V3_MEMBERSHIP_REPORT:		return "v3 member report  ";
 	case IGMP_V2_LEAVE_GROUP:		return "leave message     ";
-	case IGMP_DVMRP:
-	  switch (code) {
-	    case DVMRP_PROBE:			return "neighbor probe    ";
-	    case DVMRP_REPORT:			return "route report      ";
-	    case DVMRP_ASK_NEIGHBORS:		return "neighbor request  ";
-	    case DVMRP_NEIGHBORS:		return "neighbor list     ";
-	    case DVMRP_ASK_NEIGHBORS2:		return "neighbor request 2";
-	    case DVMRP_NEIGHBORS2:		return "neighbor list 2   ";
-	    case DVMRP_PRUNE:			return "prune message     ";
-	    case DVMRP_GRAFT:			return "graft message     ";
-	    case DVMRP_GRAFT_ACK:		return "graft message ack ";
-	    case DVMRP_INFO_REQUEST:		return "info request      ";
-	    case DVMRP_INFO_REPLY:		return "info reply        ";
-	    default:
-		    snprintf(unknown, sizeof(unknown), "unknown DVMRP %3d ", code);
-		    return unknown;
-	  }
- 	case IGMP_PIM:
- 	  switch (code) {
- 	    case PIM_QUERY:			return "PIM Router-Query  ";
- 	    case PIM_REGISTER:			return "PIM Register      ";
- 	    case PIM_REGISTER_STOP:		return "PIM Register-Stop ";
- 	    case PIM_JOIN_PRUNE:		return "PIM Join/Prune    ";
- 	    case PIM_RP_REACHABLE:		return "PIM RP-Reachable  ";
- 	    case PIM_ASSERT:			return "PIM Assert        ";
- 	    case PIM_GRAFT:			return "PIM Graft         ";
- 	    case PIM_GRAFT_ACK:			return "PIM Graft-Ack     ";
- 	    default:
- 		    snprintf(unknown, sizeof(unknown), "unknown PIM msg%3d", code);
-		    return unknown;
- 	  }
-	case IGMP_MTRACE:			return "IGMP trace query  ";
-	case IGMP_MTRACE_RESP:			return "IGMP trace reply  ";
 	default:
-		snprintf(unknown, sizeof(unknown), "unk: 0x%02x/0x%02x    ", type, code);
-		return unknown;
+	    snprintf(unknown, sizeof(unknown), "unk: 0x%02x/0x%02x    ", type, code);
+	    return unknown;
     }
 }
 
@@ -306,40 +268,9 @@ void accept_igmp(int ifi, size_t recvlen)
 	    accept_membership_report(ifi, src, dst, (struct igmpv3_report *)(recv_buf + iphdrlen), recvlen - iphdrlen);
 	    return;
 
-	case IGMP_DVMRP:
- 	case IGMP_PIM:
-	case IGMP_MTRACE_RESP:
-	case IGMP_MTRACE:
 	default:
 	    break;
     }
-}
-
-/*
- * Some IGMP messages are more important than others.  This routine
- * determines the logging level at which to log a send error (often
- * "No route to host").  This is important when there is asymmetric
- * reachability and someone is trying to, i.e., mrinfo me periodically.
- */
-static int igmp_log_level(uint32_t type, uint32_t code)
-{
-    switch (type) {
-	case IGMP_MTRACE_RESP:
-	    return LOG_INFO;
-
-	case IGMP_DVMRP:
-	  switch (code) {
-	    case DVMRP_NEIGHBORS:
-	    case DVMRP_NEIGHBORS2:
-		return LOG_INFO;
-	  }
-	  break;
-
-	default:
-	    break;
-    }
-
-    return LOG_WARNING;
 }
 
 /*
@@ -501,7 +432,7 @@ void send_igmp(uint32_t src, uint32_t dst, int type, int code, uint32_t group, i
     struct sockaddr_in sin;
     struct ip *ip;
     size_t len;
-    int rc, setloop = 0;
+    int rc;
 
     /* Set IP header length,  router-alert is optional */
     ip        = (struct ip *)send_buf;
@@ -512,13 +443,8 @@ void send_igmp(uint32_t src, uint32_t dst, int type, int code, uint32_t group, i
     else
        len = build_igmp(src, dst, type, code, group, datalen);
 
-    if (IN_MULTICAST(ntohl(dst))) {
+    if (IN_MULTICAST(ntohl(dst)))
 	k_set_if(src);
-	if (type != IGMP_DVMRP || dst == allhosts_group) {
-	    setloop = 1;
-	    k_set_loop(TRUE);
-	}
-    }
 
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
@@ -532,12 +458,9 @@ void send_igmp(uint32_t src, uint32_t dst, int type, int code, uint32_t group, i
 	if (errno == ENETDOWN)
 	    check_vif_state();
 	else
-	    logit(igmp_log_level(type, code), errno, "sendto to %s on %s",
+	    logit(LOG_WARNING, errno, "sendto to %s on %s",
 		  inet_fmt(dst, s1, sizeof(s1)), inet_fmt(src, s2, sizeof(s2)));
     }
-
-    if (setloop)
-	    k_set_loop(FALSE);
 
     logit(LOG_DEBUG, 0, "SENT %s from %-15s to %s", igmp_packet_kind(type, code),
 	  src == INADDR_ANY ? "INADDR_ANY" : inet_fmt(src, s1, sizeof(s1)),

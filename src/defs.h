@@ -64,7 +64,6 @@
 typedef void (*cfunc_t) (void*);
 typedef void (*ihfunc_t) (int);
 
-#include "dvmrp.h"
 #include "igmpv2.h"
 #include "igmpv3.h"
 #include "vif.h"
@@ -123,8 +122,6 @@ extern uint32_t		router_timeout;
 extern uint32_t		allhosts_group;
 extern uint32_t		allrtrs_group;
 extern uint32_t		allreports_group;
-extern uint32_t		dvmrp_group;
-extern uint32_t		dvmrp_genid;
 extern uint32_t		igmp_response_interval;
 extern uint32_t		igmp_query_interval;
 extern uint32_t		igmp_last_member_interval;
@@ -135,11 +132,6 @@ extern int		use_syslog;
 extern int		running;
 extern int		haveterminal;
 extern int		did_final_init;
-extern time_t           mrouted_init_time;
-
-extern int		routes_changed;
-extern int		delay_change_reports;
-extern unsigned		nroutes;
 
 extern vifi_t		numvifs;
 extern int		vifs_down;
@@ -151,11 +143,36 @@ extern char		s2[MAX_INET_BUF_LEN];
 extern char		s3[MAX_INET_BUF_LEN];
 extern char		s4[MAX_INET_BUF_LEN];
 
-#ifndef IGMP_PIM
-#define	IGMP_PIM	0x14
+/*
+ * Limit on length of route data
+ */
+#define MAX_IP_PACKET_LEN	576
+#define MIN_IP_HEADER_LEN	20
+#define IP_HEADER_RAOPT_LEN	(router_alert ? 24 : 20)
+#define MAX_IP_HEADER_LEN	60
+#define MAX_DVMRP_DATA_LEN \
+		( MAX_IP_PACKET_LEN - MAX_IP_HEADER_LEN - IGMP_MINLEN )
+
+/* NetBSD 6.1, for instance, does not have IPOPT_RA defined. */
+#ifndef IPOPT_RA
+#define IPOPT_RA		148
 #endif
-#ifndef IPPROTO_IPIP
-#define	IPPROTO_IPIP	4
+
+/*
+ * The IGMPv2 <netinet/in.h> defines INADDR_ALLRTRS_GROUP, but earlier
+ * ones don't, so we define it conditionally here.
+ */
+#ifndef INADDR_ALLRTRS_GROUP
+					/* address for multicast mtrace msg */
+#define INADDR_ALLRTRS_GROUP	(uint32_t)0xe0000002	/* 224.0.0.2 */
+#endif
+
+#ifndef INADDR_ALLRPTS_GROUP
+#define INADDR_ALLRPTS_GROUP    ((in_addr_t)0xe0000016) /* 224.0.0.22, IGMPv3 */
+#endif
+
+#ifndef INADDR_MAX_LOCAL_GROUP
+#define INADDR_MAX_LOCAL_GROUP	(uint32_t)0xe00000ff	/* 224.0.0.255 */
 #endif
 
 /*
@@ -184,14 +201,6 @@ extern char		s4[MAX_INET_BUF_LEN];
 #define IGMP_V3_MEMBERSHIP_REPORT       IGMP_v3_HOST_MEMBERSHIP_REPORT
 #else
 #define IGMP_V3_MEMBERSHIP_REPORT	0x22	/* Ver. 3 membership report */
-#endif
-
-/*
- * NetBSD also renamed the mtrace types.
- */
-#if !defined(IGMP_MTRACE_RESP) && defined(IGMP_MTRACE_REPLY)
-#define	IGMP_MTRACE_RESP		IGMP_MTRACE_REPLY
-#define	IGMP_MTRACE			IGMP_MTRACE_QUERY
 #endif
 
 /* main.c */
@@ -227,7 +236,7 @@ extern int		igmp_debug_kind(uint32_t, uint32_t);
 
 /* vif.c */
 extern void		init_vifs(void);
-extern void		zero_vif(struct uvif *, int);
+extern void		zero_vif(struct uvif *);
 extern int		install_uvif(struct uvif *);
 extern void		check_vif_state(void);
 extern struct uvif     *find_uvif(vifi_t);
@@ -269,7 +278,6 @@ extern void		k_set_rcvbuf(int, int);
 extern void		k_hdr_include(int);
 extern void		k_set_pktinfo(int);
 extern void		k_set_ttl(int);
-extern void		k_set_loop(int);
 extern void		k_set_if(uint32_t);
 extern void		k_join(uint32_t, uint32_t);
 extern void		k_leave(uint32_t, uint32_t);

@@ -86,20 +86,6 @@ void k_set_ttl(int t)
     curttl = t;
 }
 
-
-/*
- * Set/reset the IP_MULTICAST_LOOP. Set/reset is specified by "flag".
- */
-void k_set_loop(int flag)
-{
-    uint8_t loop;
-
-    loop = flag;
-    if (setsockopt(igmp_socket, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop)) < 0)
-        logit(LOG_ERR, errno, "Failed setting socket IP_MULTICAST_LOOP to %u", loop);
-}
-
-
 /*
  * Set the IP_MULTICAST_IF option on local interface ifa.
  */

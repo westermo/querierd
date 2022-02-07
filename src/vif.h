@@ -82,13 +82,7 @@ typedef struct {
 struct uvif {
     TAILQ_ENTRY(uvif) uv_link;		/* link to next/prev vif            */
     uint32_t	     uv_flags;	        /* VIFF_ flags defined below         */
-    uint8_t	     uv_metric;         /* cost of this vif                  */
-    uint8_t	     uv_admetric;       /* advertised cost of this vif       */
-    uint8_t	     uv_threshold;      /* min ttl req. to forward on vif    */
-    uint32_t	     uv_rate_limit;     /* rate limit on this vif            */
     uint32_t	     uv_lcl_addr;       /* local address of this vif         */
-    uint32_t	     uv_rmt_addr;       /* remote end-point addr (tunnels)   */
-    uint32_t	     uv_dst_addr;       /* destination for DVMRP/PIM messages*/
     uint32_t	     uv_subnet;         /* subnet number         (phyints)   */
     uint32_t	     uv_subnetmask;     /* subnet mask           (phyints)   */
     uint32_t	     uv_subnetbcast;    /* subnet broadcast addr (phyints)   */
@@ -98,11 +92,6 @@ struct uvif {
     struct listaddr *uv_querier;        /* IGMP querier on vif (one or none) */
     int		     uv_igmpv1_warn;    /* To rate-limit IGMPv1 warnings     */
     struct phaddr   *uv_addrs;	        /* Additional subnets on this vif    */
-    struct vif_filter *uv_filter;       /* Route filters on this vif	     */
-    int		     uv_nbrup;	        /* Counter for neighbor up events    */
-    int		     uv_icmp_warn;      /* To rate-limit ICMP warnings	     */
-    uint32_t	     uv_nroutes;        /* num routes with this vif as parent*/
-    struct ip 	    *uv_encap_hdr;      /* Pre-formed header to encap msgs   */
     int		     uv_ifindex;        /* Primarily for Linux systems       */
 };
 
@@ -119,13 +108,6 @@ struct uvif {
 #define	VIFF_FORCE_LEAF		0x100000	/* ignore nbrs on this vif   */
 #define	VIFF_OTUNNEL		0x200000	/* DVMRP msgs "beside" tunnel*/
 #define	VIFF_IGMPV2		0x400000	/* Act as an IGMPv2 Router   */
-
-#define	AVOID_TRANSIT(v, uv, r)						\
-    (((r)->rt_parent != NO_VIF) && ((r)->rt_gateway != 0) &&		\
-     (uv->uv_flags & VIFF_NOTRANSIT) && (find_uvif((r)->rt_parent)->uv_flags & VIFF_NOTRANSIT))
-
-#define UVIF_FOREACH(v, uv)						\
-    for ((v) = 0, (uv) = find_uvif(v); (v) < numvifs && uv; (v)++, (uv) = find_uvif(v))
 
 struct phaddr {
     struct phaddr   *pa_next;
