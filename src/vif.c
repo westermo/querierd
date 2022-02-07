@@ -56,7 +56,7 @@ void init_vifs(void)
     vifi_t vifi;
 
     numvifs = 0;
-    vifs_down = FALSE;
+    vifs_down = 0;
 
     /*
      * Configure the vifs based on the interface configuration of the
@@ -144,7 +144,7 @@ void check_vif_state(void)
     if (checking_vifs)
 	return;
 
-    vifs_down = FALSE;
+    vifs_down = 0;
     checking_vifs = 1;
     UVIF_FOREACH(vifi, uv) {
 	if (uv->uv_flags & VIFF_DISABLED)
@@ -162,7 +162,7 @@ void check_vif_state(void)
 		uv->uv_flags &= ~VIFF_DOWN;
 		start_vif(uv);
 	    } else {
-		vifs_down = TRUE;
+		vifs_down = 1;
 	    }
 	} else {
 	    if (!(ifr.ifr_flags & IFF_UP)) {
@@ -170,7 +170,7 @@ void check_vif_state(void)
 		    uv->uv_name, vifi);
 		stop_vif(uv);
 		uv->uv_flags |= VIFF_DOWN;
-		vifs_down = TRUE;
+		vifs_down = 1;
 	    }
 	}
     }

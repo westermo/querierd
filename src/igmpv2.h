@@ -37,3 +37,32 @@
  * method of refreshing timers, this should get fixed.
  */
 #define OLD_AGE_THRESHOLD		igmp_robustness
+
+/*
+ * The original multicast releases defined
+ * IGMP_HOST_{MEMBERSHIP_QUERY,MEMBERSHIP_REPORT,NEW_MEMBERSHIP_REPORT
+ *   ,LEAVE_MESSAGE}.  Later releases removed the HOST and inserted
+ * the IGMP version number.  NetBSD inserted the version number in
+ * a different way.  querierd use the new names, so we #define them
+ * to the old ones if needed.
+ */
+#if !defined(IGMP_MEMBERSHIP_QUERY) && defined(IGMP_HOST_MEMBERSHIP_QUERY)
+#define	IGMP_MEMBERSHIP_QUERY		IGMP_HOST_MEMBERSHIP_QUERY
+#define	IGMP_V2_LEAVE_GROUP		IGMP_HOST_LEAVE_MESSAGE
+#endif
+#ifndef	IGMP_V1_MEMBERSHIP_REPORT
+#ifdef	IGMP_HOST_MEMBERSHIP_REPORT
+#define	IGMP_V1_MEMBERSHIP_REPORT	IGMP_HOST_MEMBERSHIP_REPORT
+#define	IGMP_V2_MEMBERSHIP_REPORT	IGMP_HOST_NEW_MEMBERSHIP_REPORT
+#endif
+#ifdef	IGMP_v1_HOST_MEMBERSHIP_REPORT
+#define	IGMP_V1_MEMBERSHIP_REPORT	IGMP_v1_HOST_MEMBERSHIP_REPORT
+#define	IGMP_V2_MEMBERSHIP_REPORT	IGMP_v2_HOST_MEMBERSHIP_REPORT
+#endif
+#endif
+#if defined(__FreeBSD__)		/* From FreeBSD 8.x */
+#define IGMP_V3_MEMBERSHIP_REPORT       IGMP_v3_HOST_MEMBERSHIP_REPORT
+#else
+#define IGMP_V3_MEMBERSHIP_REPORT	0x22	/* Ver. 3 membership report */
+#endif
+

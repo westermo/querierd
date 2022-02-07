@@ -71,46 +71,6 @@ typedef void (*ihfunc_t) (int);
 #include "pev.h"
 
 /*
- * Miscellaneous constants and macros.
- */
-
-/* Older versions of UNIX don't really give us true raw sockets.
- * Instead, they expect ip_len and ip_off in host byte order, and also
- * provide them to us in that format when receiving raw frames.
- *
- * This list could probably be made longer, e.g., SunOS and __bsdi__
- */
-#if defined(__NetBSD__) ||					\
-    (defined(__FreeBSD__) && (__FreeBSD_version < 1100030)) ||	\
-    (defined(__OpenBSD__) && (OpenBSD < 200311))
-#define HAVE_IP_HDRINCL_BSD_ORDER
-#endif
-
-#define FALSE		0
-#define TRUE		1
-
-#define EQUAL(s1, s2)	(strcmp((s1), (s2)) == 0)
-#define ARRAY_LEN(a)    (sizeof((a)) / sizeof((a)[0]))
-
-#define	DEL_RTE_GROUP	0
-#define	DEL_ALL_ROUTES	1
-			    /* for Deleting kernel table entries */
-
-#define JAN_1970	2208988800UL	/* 1970 - 1900 in seconds */
-
-#if defined(_AIX) || (defined(BSD) && BSD >= 199103)
-#define	HAVE_SA_LEN
-#endif
-
-/*
- * Extensions to errno for singaling to cfparse.y
- */
-#define ENOTMINE 	2000
-#define ELOOPBACK	2001
-#define ERMTLOCAL	2002
-#define EDUPLICATE	2003
-
-/*
  * External declarations for global variables and functions.
  */
 #define RECV_BUF_SIZE 8192
@@ -173,34 +133,6 @@ extern char		s4[MAX_INET_BUF_LEN];
 
 #ifndef INADDR_MAX_LOCAL_GROUP
 #define INADDR_MAX_LOCAL_GROUP	(uint32_t)0xe00000ff	/* 224.0.0.255 */
-#endif
-
-/*
- * The original multicast releases defined
- * IGMP_HOST_{MEMBERSHIP_QUERY,MEMBERSHIP_REPORT,NEW_MEMBERSHIP_REPORT
- *   ,LEAVE_MESSAGE}.  Later releases removed the HOST and inserted
- * the IGMP version number.  NetBSD inserted the version number in
- * a different way.  mrouted uses the new names, so we #define them
- * to the old ones if needed.
- */
-#if !defined(IGMP_MEMBERSHIP_QUERY) && defined(IGMP_HOST_MEMBERSHIP_QUERY)
-#define	IGMP_MEMBERSHIP_QUERY		IGMP_HOST_MEMBERSHIP_QUERY
-#define	IGMP_V2_LEAVE_GROUP		IGMP_HOST_LEAVE_MESSAGE
-#endif
-#ifndef	IGMP_V1_MEMBERSHIP_REPORT
-#ifdef	IGMP_HOST_MEMBERSHIP_REPORT
-#define	IGMP_V1_MEMBERSHIP_REPORT	IGMP_HOST_MEMBERSHIP_REPORT
-#define	IGMP_V2_MEMBERSHIP_REPORT	IGMP_HOST_NEW_MEMBERSHIP_REPORT
-#endif
-#ifdef	IGMP_v1_HOST_MEMBERSHIP_REPORT
-#define	IGMP_V1_MEMBERSHIP_REPORT	IGMP_v1_HOST_MEMBERSHIP_REPORT
-#define	IGMP_V2_MEMBERSHIP_REPORT	IGMP_v2_HOST_MEMBERSHIP_REPORT
-#endif
-#endif
-#if defined(__FreeBSD__)		/* From FreeBSD 8.x */
-#define IGMP_V3_MEMBERSHIP_REPORT       IGMP_v3_HOST_MEMBERSHIP_REPORT
-#else
-#define IGMP_V3_MEMBERSHIP_REPORT	0x22	/* Ver. 3 membership report */
 #endif
 
 /* main.c */

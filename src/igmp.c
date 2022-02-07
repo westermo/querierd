@@ -46,6 +46,8 @@ static void	igmp_read(int sd, void *arg);
  */
 void igmp_init(void)
 {
+    const int BUFSZ = 256 * 1024;
+    const int MINSZ =  48 * 1024;
     struct ip *ip;
     uint8_t *ip_opt;
 
@@ -61,9 +63,9 @@ void igmp_init(void)
     if (igmp_socket < 0)
 	logit(LOG_ERR, errno, "Failed creating IGMP socket");
 
-    k_hdr_include(TRUE);	/* include IP header when sending */
-    k_set_pktinfo(TRUE);	/* ifindex in aux data on receive */
-    k_set_rcvbuf(256*1024,48*1024);	/* lots of input buffering        */
+    k_hdr_include(1);		/* include IP header when sending */
+    k_set_pktinfo(1);		/* ifindex in aux data on receive */
+    k_set_rcvbuf(BUFSZ, MINSZ);	/* lots of input buffering        */
     k_set_ttl(1);		/* restrict multicasts to one hop */
 
     /*
@@ -207,11 +209,7 @@ void accept_igmp(int ifi, size_t recvlen)
     }
 
     iphdrlen  = ip->ip_hl << 2;
-#ifdef HAVE_IP_HDRINCL_BSD_ORDER
-    ipdatalen = ip->ip_len - iphdrlen;
-#else
     ipdatalen = ntohs(ip->ip_len) - iphdrlen;
-#endif
 
     if ((size_t)(iphdrlen + ipdatalen) != recvlen) {
 	logit(LOG_INFO, 0,
@@ -356,11 +354,7 @@ size_t build_query(uint32_t src, uint32_t dst, int type, int code, uint32_t grou
     ip                = (struct ip *)send_buf;
     ip->ip_src.s_addr = src;
     ip->ip_dst.s_addr = dst;
-#ifdef HAVE_IP_HDRINCL_BSD_ORDER
-    ip->ip_len        = len;
-#else
     ip->ip_len        = htons(len);
-#endif
     if (IN_MULTICAST(ntohl(dst)))
 	ip->ip_ttl    = curttl;
     else
@@ -402,11 +396,7 @@ size_t build_igmp(uint32_t src, uint32_t dst, int type, int code, uint32_t group
     ip                      = (struct ip *)send_buf;
     ip->ip_src.s_addr       = src;
     ip->ip_dst.s_addr       = dst;
-#ifdef HAVE_IP_HDRINCL_BSD_ORDER
-    ip->ip_len              = len;
-#else
     ip->ip_len              = htons(len);
-#endif
     if (IN_MULTICAST(ntohl(dst)))
 	ip->ip_ttl = curttl;
     else
@@ -448,9 +438,6 @@ void send_igmp(uint32_t src, uint32_t dst, int type, int code, uint32_t group, i
 
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
-#ifdef HAVE_SA_LEN
-    sin.sin_len = sizeof(sin);
-#endif
     sin.sin_addr.s_addr = dst;
 
     rc = sendto(igmp_socket, send_buf, len, 0, (struct sockaddr *)&sin, sizeof(sin));
