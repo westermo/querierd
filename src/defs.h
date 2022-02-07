@@ -19,9 +19,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
-#if defined(__bsdi__) || (defined(SunOS) && SunOS < 50)
-#include <sys/sockio.h>
-#endif /* bsdi || SunOS 4.x */
 #include <time.h>
 #include <sys/time.h>
 #include <sys/uio.h>
@@ -32,21 +29,9 @@
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/igmp.h>
-#if defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
-#include <osreldate.h>
-#endif /* __FreeBSD__ */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD_version >= 220000) || defined(__FreeBSD_kernel__)
-#define rtentry kernel_rtentry
-#include <net/route.h>
-#undef rtentry
-#endif /* bsdi or __FreeBSD_version >= 220000 */
-#ifdef __linux__
 #define _LINUX_IN_H             /* For Linux <= 2.6.25 */
 #include <linux/types.h>
 #include <linux/mroute.h>
-#else
-#include <netinet/ip_mroute.h>
-#endif
 #if defined(HAVE_STRLCPY)
 #include <string.h>
 #endif
@@ -54,11 +39,7 @@
 #include <stdlib.h>
 #endif
 #if defined(HAVE_PIDFILE)
-#if defined(OpenBSD) || defined(NetBSD)
-#include <util.h>
-#else
 #include <libutil.h>
-#endif
 #endif
 
 typedef void (*cfunc_t) (void*);
@@ -95,7 +76,6 @@ extern int		did_final_init;
 
 extern vifi_t		numvifs;
 extern int		vifs_down;
-extern int		udp_socket;
 
 #define MAX_INET_BUF_LEN 19
 extern char		s1[MAX_INET_BUF_LEN];

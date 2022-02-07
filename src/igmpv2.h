@@ -60,9 +60,4 @@
 #define	IGMP_V2_MEMBERSHIP_REPORT	IGMP_v2_HOST_MEMBERSHIP_REPORT
 #endif
 #endif
-#if defined(__FreeBSD__)		/* From FreeBSD 8.x */
-#define IGMP_V3_MEMBERSHIP_REPORT       IGMP_v3_HOST_MEMBERSHIP_REPORT
-#else
 #define IGMP_V3_MEMBERSHIP_REPORT	0x22	/* Ver. 3 membership report */
-#endif
-
