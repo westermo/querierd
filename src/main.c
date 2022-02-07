@@ -272,8 +272,6 @@ static void cleanup(void)
 	in_cleanup++;
 
 	stop_all_vifs();
-	close(udp_socket);
-
 	igmp_exit();
     }
 }
@@ -312,7 +310,6 @@ void restart(void)
      */
     stop_all_vifs();
     igmp_exit();
-    close(udp_socket);
 
     igmp_init();
     init_vifs();

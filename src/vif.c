@@ -10,8 +10,6 @@
  */
 vifi_t	     numvifs;		/* number of vifs in use		    */
 int	     vifs_down;		/* 1=>some interfaces are down		    */
-int	     udp_socket;	/* Some kernels don't support ioctls on raw */
-				/* IP sockets, so we need a UDP socket too  */
 
 /*
  * Private variables.
@@ -64,7 +62,6 @@ void init_vifs(void)
      * (Open a UDP socket for ioctl use in the config procedures if
      * the kernel can't handle IOCTL's on the IGMP socket.)
      */
-    udp_socket = igmp_socket;
     config_vifs_from_kernel();
     config_vifs_from_file();
     config_vifs_correlate();
@@ -152,7 +149,7 @@ void check_vif_state(void)
 
 	memset(&ifr, 0, sizeof(ifr));
 	memcpy(ifr.ifr_name, uv->uv_name, sizeof(ifr.ifr_name));
-	if (ioctl(udp_socket, SIOCGIFFLAGS, &ifr) < 0)
+	if (ioctl(igmp_socket, SIOCGIFFLAGS, &ifr) < 0)
 	    logit(LOG_ERR, errno, "Failed ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
 
 	if (uv->uv_flags & VIFF_DOWN) {
