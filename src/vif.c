@@ -214,19 +214,16 @@ static void start_vif(struct uvif *uv)
 {
     struct listaddr *a;
     struct phaddr *p;
-    uint32_t src;
-
-    src = uv->uv_lcl_addr;
 
     /*
      * Join the ALL-ROUTERS multicast group on the interface.
      * This allows mtrace requests to loop back if they are run
      * on the multicast router.
      */
-    k_join(allrtrs_group, src);
+    k_join(allrtrs_group, uv->uv_ifindex);
 
     /* Join INADDR_ALLRPTS_GROUP to support IGMPv3 membership reports */
-    k_join(allreports_group, src);
+    k_join(allreports_group, uv->uv_ifindex);
 
     /*
      * Until neighbors are discovered, assume responsibility for sending
@@ -256,12 +253,12 @@ static void stop_vif(struct uvif *uv)
     /*
      * Depart from the ALL-ROUTERS multicast group on the interface.
      */
-    k_leave(allrtrs_group, uv->uv_lcl_addr);
+    k_leave(allrtrs_group, uv->uv_ifindex);
 
     /*
      * Depart from the ALL-REPORTS multicast group on the interface.
      */
-    k_leave(allreports_group, uv->uv_lcl_addr);
+    k_leave(allreports_group, uv->uv_ifindex);
 
     logit(LOG_DEBUG, 0, "Releasing querier duties on interface %s", uv->uv_name);
     uv->uv_flags &= ~VIFF_QUERIER;

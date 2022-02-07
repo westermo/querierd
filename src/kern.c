@@ -106,12 +106,12 @@ void k_set_if(uint32_t ifa)
 /*
  * Join a multicast group.
  */
-void k_join(uint32_t grp, uint32_t ifa)
+void k_join(uint32_t grp, int ifindex)
 {
-    struct ip_mreq mreq;
+    struct ip_mreqn mreq;
 
     mreq.imr_multiaddr.s_addr = grp;
-    mreq.imr_interface.s_addr = ifa;
+    mreq.imr_ifindex = ifindex;
 
     if (setsockopt(igmp_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
 	switch (errno) {
@@ -124,8 +124,8 @@ void k_join(uint32_t grp, uint32_t ifa)
 		break;
 #endif
 	    default:
-		logit(LOG_WARNING, errno, "Cannot join group %s on interface %s",
-		      inet_fmt(grp, s1, sizeof(s1)), inet_fmt(ifa, s2, sizeof(s2)));
+		logit(LOG_WARNING, errno, "Cannot join group %s on ifindex %d",
+		      inet_fmt(grp, s1, sizeof(s1)), ifindex);
 		break;
 	}
     }
@@ -135,16 +135,16 @@ void k_join(uint32_t grp, uint32_t ifa)
 /*
  * Leave a multicast group.
  */
-void k_leave(uint32_t grp, uint32_t ifa)
+void k_leave(uint32_t grp, int ifindex)
 {
-    struct ip_mreq mreq;
+    struct ip_mreqn mreq;
 
     mreq.imr_multiaddr.s_addr = grp;
-    mreq.imr_interface.s_addr = ifa;
+    mreq.imr_ifindex = ifindex;
 
     if (setsockopt(igmp_socket, IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
-	logit(LOG_WARNING, errno, "Cannot leave group %s on interface %s",
-	      inet_fmt(grp, s1, sizeof(s1)), inet_fmt(ifa, s2, sizeof(s2)));
+	logit(LOG_WARNING, errno, "Cannot leave group %s on ifindex %d",
+	      inet_fmt(grp, s1, sizeof(s1)), ifindex);
 }
 
 /**

@@ -211,8 +211,8 @@ extern void		k_hdr_include(int);
 extern void		k_set_pktinfo(int);
 extern void		k_set_ttl(int);
 extern void		k_set_if(uint32_t);
-extern void		k_join(uint32_t, uint32_t);
-extern void		k_leave(uint32_t, uint32_t);
+extern void		k_join(uint32_t, int);
+extern void		k_leave(uint32_t, int);
 
 #ifndef HAVE_STRLCPY
 extern size_t		strlcpy(char *dst, const char *src, size_t siz);
