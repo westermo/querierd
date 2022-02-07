@@ -441,7 +441,7 @@ void send_igmp(int ifi, uint32_t src, uint32_t dst, int type, int code, uint32_t
     sin.sin_family = AF_INET;
     sin.sin_addr.s_addr = dst;
 
-    rc = sendto(igmp_socket, send_buf, len, 0, (struct sockaddr *)&sin, sizeof(sin));
+    rc = sendto(igmp_socket, send_buf, len, MSG_DONTROUTE, (struct sockaddr *)&sin, sizeof(sin));
     if (rc < 0) {
 	if (errno == ENETDOWN)
 	    check_vif_state();
