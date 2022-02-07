@@ -45,9 +45,9 @@
 typedef void (*cfunc_t) (void*);
 typedef void (*ihfunc_t) (int);
 
+#include "iface.h"
 #include "igmpv2.h"
 #include "igmpv3.h"
-#include "vif.h"
 #include "pathnames.h"
 #include "pev.h"
 
@@ -152,31 +152,29 @@ extern void		send_igmp(int, uint32_t, uint32_t, int, int, uint32_t, int);
 extern char *		igmp_packet_kind(uint32_t, uint32_t);
 extern int		igmp_debug_kind(uint32_t, uint32_t);
 
-/* vif.c */
-extern void		init_vifs(void);
-extern void		zero_vif(struct uvif *);
-extern void		check_vif_state(void);
-extern void		router_timeout_cb(int, void *);
-extern void		stop_all_vifs(void);
+/* iface.c */
+extern void		iface_init(void);
+extern void		iface_zero(struct iface *);
+extern void		iface_check_state(void);
+extern void		iface_stop_all(void);
 extern void		accept_group_report(int, uint32_t, uint32_t, uint32_t, int);
-extern void		query_groups(int, void *);
 extern void		accept_leave_message(int, uint32_t, uint32_t, uint32_t);
 extern void		accept_membership_query(int, uint32_t, uint32_t, uint32_t, int, int);
 extern void             accept_membership_report(int, uint32_t, uint32_t, struct igmpv3_report *, ssize_t);
 
 /* config.c */
 extern void		config_set_ifflag(uint32_t flag);
-extern struct uvif     *config_iface_iter(int first);
-extern struct uvif     *config_iface_add(char *ifname);
-extern struct uvif     *config_find_ifname(char *nm);
-extern struct uvif     *config_find_ifaddr(in_addr_t addr);
-extern struct uvif     *config_find_iface(int ifindex);
-extern struct uvif     *config_init_tunnel(in_addr_t lcl_addr, in_addr_t rmt_addr, uint32_t flags);
-extern void		config_vifs_correlate(void);
-extern void		config_vifs_from_kernel(void);
+extern struct iface     *config_iface_iter(int first);
+extern struct iface     *config_iface_add(char *ifname);
+extern struct iface     *config_find_ifname(char *nm);
+extern struct iface     *config_find_ifaddr(in_addr_t addr);
+extern struct iface     *config_find_iface(int ifindex);
+extern struct iface     *config_init_tunnel(in_addr_t lcl_addr, in_addr_t rmt_addr, uint32_t flags);
+extern void		config_iface_correlate(void);
+extern void		config_iface_from_kernel(void);
 
 /* cfparse.y */
-extern void		config_vifs_from_file(void);
+extern void		config_iface_from_file(void);
 
 /* inet.c */
 extern int		inet_valid_group(uint32_t);

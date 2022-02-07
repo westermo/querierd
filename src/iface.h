@@ -2,25 +2,25 @@
  * Parts of this program has been derived from mrouted.  It is covered
  * by the license in the accompanying file named "LICENSE".
  */
-#ifndef QUERIERD_VIF_H_
-#define QUERIERD_VIF_H_
+#ifndef QUERIERD_IFACE_H_
+#define QUERIERD_IFACE_H_
 
 #include <stdint.h>
 #include "queue.h"
 
-struct uvif {
-    TAILQ_ENTRY(uvif) uv_link;		/* link to next/prev vif             */
+struct iface {
+    TAILQ_ENTRY(iface) uv_link;		/* link to next/prev interface       */
     uint32_t	     uv_flags;	        /* VIFF_ flags defined below         */
-    uint32_t	     uv_lcl_addr;       /* local address of this vif         */
+    uint32_t	     uv_lcl_addr;       /* local address of this interface   */
     uint32_t	     uv_subnet;         /* subnet number         (phyints)   */
     uint32_t	     uv_subnetmask;     /* subnet mask           (phyints)   */
     uint32_t	     uv_subnetbcast;    /* subnet broadcast addr (phyints)   */
     char	     uv_name[IFNAMSIZ]; /* interface name                    */
     TAILQ_HEAD(,listaddr) uv_static;    /* list of static groups (phyints)   */
     TAILQ_HEAD(,listaddr) uv_groups;    /* list of local groups  (phyints)   */
-    struct listaddr *uv_querier;        /* IGMP querier on vif (one or none) */
+    struct listaddr *uv_querier;        /* IGMP querier (one or none)        */
     int		     uv_igmpv1_warn;    /* To rate-limit IGMPv1 warnings     */
-    struct phaddr   *uv_addrs;	        /* Additional subnets on this vif    */
+    struct phaddr   *uv_addrs;	        /* Secondary addresses               */
     int		     uv_ifindex;        /* Primarily for Linux systems       */
 };
 
@@ -52,7 +52,7 @@ struct listaddr {
 
 #define	NBRF_STATIC_GROUP	0x4000	/* Static group entry		    */
 
-#endif /* QUERIERD_VIF_H_ */
+#endif /* QUERIERD_IFACE_H_ */
 
 /**
  * Local Variables:

@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
 
     pev_init();
     igmp_init();
-    init_vifs();
+    iface_init();
 
     pev_sig_add(SIGHUP,  handle_signals, NULL);
     pev_sig_add(SIGINT,  handle_signals, NULL);
@@ -271,7 +271,7 @@ static void cleanup(void)
     if (!in_cleanup) {
 	in_cleanup++;
 
-	stop_all_vifs();
+	iface_stop_all();
 	igmp_exit();
     }
 }
@@ -308,11 +308,11 @@ void restart(void)
     /*
      * reset all the entries
      */
-    stop_all_vifs();
+    iface_stop_all();
     igmp_exit();
 
     igmp_init();
-    init_vifs();
+    iface_init();
 
     /* Touch PID file to acknowledge SIGHUP */
     pidfile(pid_file);

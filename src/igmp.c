@@ -444,7 +444,7 @@ void send_igmp(int ifi, uint32_t src, uint32_t dst, int type, int code, uint32_t
     rc = sendto(igmp_socket, send_buf, len, MSG_DONTROUTE, (struct sockaddr *)&sin, sizeof(sin));
     if (rc < 0) {
 	if (errno == ENETDOWN)
-	    check_vif_state();
+	    iface_check_state();
 	else
 	    logit(LOG_WARNING, errno, "sendto to %s on %s",
 		  inet_fmt(dst, s1, sizeof(s1)), inet_fmt(src, s2, sizeof(s2)));

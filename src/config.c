@@ -9,23 +9,23 @@
 /*
  * Exported variables.
  */
-TAILQ_HEAD(vifs, uvif) vifs = TAILQ_HEAD_INITIALIZER(vifs);
+TAILQ_HEAD(ifaces, iface) ifaces = TAILQ_HEAD_INITIALIZER(ifaces);
 
 void config_set_ifflag(uint32_t flag)
 {
-    struct uvif *uv;
+    struct iface *uv;
 
-    TAILQ_FOREACH(uv, &vifs, uv_link)
+    TAILQ_FOREACH(uv, &ifaces, uv_link)
 	uv->uv_flags |= flag;
 }
 
-struct uvif *config_iface_iter(int first)
+struct iface *config_iface_iter(int first)
 {
-    static struct uvif *next = NULL;
-    struct uvif *uv;
+    static struct iface *next = NULL;
+    struct iface *uv;
 
     if (first)
-	uv = TAILQ_FIRST(&vifs);
+	uv = TAILQ_FIRST(&ifaces);
     else
 	uv = next;
 
@@ -35,16 +35,16 @@ struct uvif *config_iface_iter(int first)
     return uv;
 }
 
-struct uvif *config_find_ifname(char *nm)
+struct iface *config_find_ifname(char *nm)
 {
-    struct uvif *uv;
+    struct iface *uv;
 
     if (!nm) {
 	errno = EINVAL;
 	return NULL;
     }
 
-    TAILQ_FOREACH(uv, &vifs, uv_link) {
+    TAILQ_FOREACH(uv, &ifaces, uv_link) {
         if (!strcmp(uv->uv_name, nm))
             return uv;
     }
@@ -52,11 +52,11 @@ struct uvif *config_find_ifname(char *nm)
     return NULL;
 }
 
-struct uvif *config_find_ifaddr(in_addr_t addr)
+struct iface *config_find_ifaddr(in_addr_t addr)
 {
-    struct uvif *uv;
+    struct iface *uv;
 
-    TAILQ_FOREACH(uv, &vifs, uv_link) {
+    TAILQ_FOREACH(uv, &ifaces, uv_link) {
 	if (addr == uv->uv_lcl_addr)
             return uv;
     }
@@ -64,11 +64,11 @@ struct uvif *config_find_ifaddr(in_addr_t addr)
     return NULL;
 }
 
-struct uvif *config_find_iface(int ifi)
+struct iface *config_find_iface(int ifi)
 {
-    struct uvif *uv;
+    struct iface *uv;
 
-    TAILQ_FOREACH(uv, &vifs, uv_link) {
+    TAILQ_FOREACH(uv, &ifaces, uv_link) {
 	if (ifi == uv->uv_ifindex)
             return uv;
     }
@@ -80,12 +80,12 @@ struct uvif *config_find_iface(int ifi)
  * Ignore any kernel interface that is disabled, or connected to the
  * same subnet as one already installed.
  */
-static int check_vif(struct uvif *v)
+static int check_iface(struct iface *v)
 {
-    struct uvif *uv;
+    struct iface *uv;
     vifi_t vifi;
 
-    TAILQ_FOREACH(uv, &vifs, uv_link) {
+    TAILQ_FOREACH(uv, &ifaces, uv_link) {
 	if (v == uv)
 	    continue;
 
@@ -102,8 +102,7 @@ static int check_vif(struct uvif *v)
 	}
 
 	/*
-	 * Same interface, but cannot have multiple VIFs on the same
-	 * interface so add as secondary IP address (altnet) for RPF
+	 * Same interface, add as secondary IP address (altnet)
 	 */
 	if (strcmp(v->uv_name, uv->uv_name) == 0) {
 	    struct phaddr *ph;
@@ -132,16 +131,16 @@ static int check_vif(struct uvif *v)
     return 0;
 }
 
-void config_vifs_correlate(void)
+void config_iface_correlate(void)
 {
     struct listaddr *al, *al_tmp;
-    struct uvif *uv, *v, *tmp;
+    struct iface *uv, *v, *tmp;
     vifi_t vifi;
 
-    TAILQ_FOREACH_SAFE(v, &vifs, uv_link, tmp) {
-	if (check_vif(v)) {
+    TAILQ_FOREACH_SAFE(v, &ifaces, uv_link, tmp) {
+	if (check_iface(v)) {
 	    logit(LOG_DEBUG, 0, "Dropping interface %s ...", v->uv_name);
-	    TAILQ_REMOVE(&vifs, v, uv_link);
+	    TAILQ_REMOVE(&ifaces, v, uv_link);
 	    free(v);
 	    continue;
 	}
@@ -152,9 +151,9 @@ void config_vifs_correlate(void)
     }
 }
 
-struct uvif *config_iface_add(char *ifname)
+struct iface *config_iface_add(char *ifname)
 {
-    struct uvif *uv;
+    struct iface *uv;
     int ifi;
 
     ifi = if_nametoindex(ifname);
@@ -163,17 +162,17 @@ struct uvif *config_iface_add(char *ifname)
 	return NULL;
     }
 
-    uv = calloc(1, sizeof(struct uvif));
+    uv = calloc(1, sizeof(struct iface));
     if (!uv) {
 	logit(LOG_ERR, errno, "failed allocating memory for iflist");
 	return NULL;
     }
 
-    zero_vif(uv);
+    iface_zero(uv);
     uv->uv_ifindex = ifi;
     strlcpy(uv->uv_name, ifname, sizeof(uv->uv_name));
 
-    TAILQ_INSERT_TAIL(&vifs, uv, uv_link);
+    TAILQ_INSERT_TAIL(&ifaces, uv, uv_link);
 
     return uv;
 }
@@ -181,11 +180,11 @@ struct uvif *config_iface_add(char *ifname)
 /*
  * Query the kernel to find network interfaces that are multicast-capable
  */
-void config_vifs_from_kernel(void)
+void config_iface_from_kernel(void)
 {
     in_addr_t addr, mask, subnet;
     struct ifaddrs *ifa, *ifap;
-    struct uvif *uv;
+    struct iface *uv;
     vifi_t vifi;
     int flags;
 

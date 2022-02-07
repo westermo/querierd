@@ -61,7 +61,7 @@ void k_hdr_include(int bool)
 
 /*
  * For IGMP reports we need to know incoming interface since proxy reporters
- * may use source IP 0.0.0.0, so we cannot rely on find_vif_direct().
+ * may use source IP 0.0.0.0, so we cannot rely on find_iface_direct().
  */
 void k_set_pktinfo(int val)
 {

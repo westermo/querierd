@@ -27,8 +27,8 @@ static FILE *fp;
 
 static int lineno;
 
-static struct uvif *v;
-static struct uvif scrap;
+static struct iface *v;
+static struct iface scrap;
 
 %}
 
@@ -295,7 +295,7 @@ static int yylex(void)
     return STRING;
 }
 
-void config_vifs_from_file(void)
+void config_iface_from_file(void)
 {
     TAILQ_INIT(&scrap.uv_static);
     TAILQ_INIT(&scrap.uv_groups);

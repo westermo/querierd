@@ -20,10 +20,13 @@ static int query_timerid = -1;
 /*
  * Forward declarations.
  */
-static void start_vif          (struct uvif *uv);
-static void stop_vif           (struct uvif *uv);
+static void start_iface          (struct iface *uv);
+static void stop_iface           (struct iface *uv);
 
-static void send_query         (struct uvif *v, uint32_t dst, int code, uint32_t group);
+static void send_query         (struct iface *v, uint32_t dst, int code, uint32_t group);
+static void query_groups       (int timeout, void *arg);
+
+static void router_timeout_cb  (int timeout, void *arg);
 
 static void delete_group_cb    (int timeout, void *arg);
 static int  delete_group_timer (int ifi, struct listaddr *g, int tmo);
@@ -35,18 +38,13 @@ static void group_version_cb   (int timeout, void *arg);
 static int  group_version_timer(int ifi, struct listaddr *g);
 
 
-/*
- * Initialize the virtual interfaces, but do not install
- * them in the kernel.  Start routing on all vifs that are
- * not down or disabled.
- */
-void init_vifs(void)
+void iface_init(void)
 {
-    struct uvif *uv;
+    struct iface *uv;
 
-    config_vifs_from_file();
-    config_vifs_from_kernel();
-    config_vifs_correlate();
+    config_iface_from_file();
+    config_iface_from_kernel();
+    config_iface_correlate();
 
     for (uv = config_iface_iter(1); uv; uv = config_iface_iter(0)) {
 	if (uv->uv_flags & VIFF_DISABLED) {
@@ -60,7 +58,7 @@ void init_vifs(void)
 	}
 
 	logit(LOG_DEBUG, 0, "starting %s; interface now in service", uv->uv_name);
-	start_vif(uv);
+	start_iface(uv);
     }
 
     /*
@@ -73,12 +71,9 @@ void init_vifs(void)
 }
 
 /*
- * Initialize the passed vif with all appropriate default values.
- * "t" is true if a tunnel, or false if a phyint.
- *
- * Note: remember to re-init all relevant TAILQ's in init_vifs()!
+ * Note: remember to re-init all relevant TAILQ's in iface_init()!
  */
-void zero_vif(struct uvif *uv)
+void iface_zero(struct iface *uv)
 {
     uv->uv_flags	= VIFF_DISABLED;
     uv->uv_lcl_addr	= 0;
@@ -99,16 +94,16 @@ void zero_vif(struct uvif *uv)
  * tunnel end-points.  Ignore interfaces that have been administratively
  * disabled.
  */
-void check_vif_state(void)
+void iface_check_state(void)
 {
-    static int checking_vifs = 0;
+    static int checking_iface = 0;
     struct ifreq ifr;
-    struct uvif *uv;
+    struct iface *uv;
 
-    if (checking_vifs)
+    if (checking_iface)
 	return;
 
-    checking_vifs = 1;
+    checking_iface = 1;
     for (uv = config_iface_iter(1); uv; uv = config_iface_iter(0)) {
 	if (uv->uv_flags & VIFF_DISABLED)
 	    continue;
@@ -122,21 +117,21 @@ void check_vif_state(void)
 	    if (ifr.ifr_flags & IFF_UP) {
 		logit(LOG_NOTICE, 0, "%s has come up; interface now in service", uv->uv_name);
 		uv->uv_flags &= ~VIFF_DOWN;
-		start_vif(uv);
+		start_iface(uv);
 	    }
 	} else {
 	    if (!(ifr.ifr_flags & IFF_UP)) {
 		logit(LOG_NOTICE, 0, "%s has gone down; interface out of service", uv->uv_name);
-		stop_vif(uv);
+		stop_iface(uv);
 		uv->uv_flags |= VIFF_DOWN;
 	    }
 	}
     }
 
-    checking_vifs = 0;
+    checking_iface = 0;
 }
 
-static void send_query(struct uvif *v, uint32_t dst, int code, uint32_t group)
+static void send_query(struct iface *v, uint32_t dst, int code, uint32_t group)
 {
     int datalen = 4;
 
@@ -164,7 +159,7 @@ static void send_query(struct uvif *v, uint32_t dst, int code, uint32_t group)
 	      code, group, datalen);
 }
 
-static void start_vif(struct uvif *uv)
+static void start_iface(struct iface *uv)
 {
     struct listaddr *a;
     struct phaddr *p;
@@ -189,13 +184,13 @@ static void start_vif(struct uvif *uv)
     send_query(uv, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
 }
 
-static void stop_vif(struct uvif *uv)
+static void stop_iface(struct iface *uv)
 {
     struct listaddr *a, *tmp;
 
     /*
      * Discard all group addresses.  (No need to tell kernel;
-     * the k_del_vif() call, below, will clean up kernel state.)
+     * the k_del_iface() call, below, will clean up kernel state.)
      */
     TAILQ_FOREACH_SAFE(a, &uv->uv_groups, al_link, tmp) {
 	TAILQ_REMOVE(&uv->uv_groups, a, al_link);
@@ -216,14 +211,11 @@ static void stop_vif(struct uvif *uv)
 }
 
 
-/*
- * stop routing on all vifs
- */
-void stop_all_vifs(void)
+void iface_stop_all(void)
 {
     struct listaddr *a, *tmp;
     struct phaddr *ph;
-    struct uvif *uv;
+    struct iface *uv;
 
     pev_timer_del(query_timerid);
 
@@ -258,9 +250,9 @@ void stop_all_vifs(void)
  * so can not cause loss of membership (but can send more packets than
  * necessary)
  */
-void query_groups(int period, void *arg)
+static void query_groups(int period, void *arg)
 {
-    struct uvif *uv;
+    struct iface *uv;
     int ifi;
 
     for (uv = config_iface_iter(1); uv; uv = config_iface_iter(0)) {
@@ -268,8 +260,7 @@ void query_groups(int period, void *arg)
 	    continue;
 
 	if (uv->uv_flags & VIFF_QUERIER)
-	    send_query(uv, allhosts_group, igmp_response_interval *
-		       IGMP_TIMER_SCALE, 0);
+	    send_query(uv, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
     }
 }
 
@@ -280,7 +271,7 @@ void query_groups(int period, void *arg)
  */
 void accept_membership_query(int ifi, uint32_t src, uint32_t dst, uint32_t group, int tmo, int ver)
 {
-    struct uvif *uv;
+    struct iface *uv;
 
     uv = config_find_iface(ifi);
     if (!uv)
@@ -396,7 +387,7 @@ static void group_debug(struct listaddr *g, char *s, int is_change)
 void accept_group_report(int ifi, uint32_t src, uint32_t dst, uint32_t group, int r_type)
 {
     struct listaddr *g;
-    struct uvif *uv;
+    struct iface *uv;
 
     inet_fmt(src, s1, sizeof(s1));
     inet_fmt(dst, s2, sizeof(s2));
@@ -526,7 +517,7 @@ void accept_group_report(int ifi, uint32_t src, uint32_t dst, uint32_t group, in
 void accept_leave_message(int ifi, uint32_t src, uint32_t dst, uint32_t group)
 {
     struct listaddr *g;
-    struct uvif *uv;
+    struct iface *uv;
 
     inet_fmt(src, s1, sizeof(s1));
     inet_fmt(group, s3, sizeof(s3));
@@ -744,9 +735,10 @@ void accept_membership_report(int ifi, uint32_t src, uint32_t dst, struct igmpv3
 /*
  * When an active querier times out we assume the role here.
  */
-void router_timeout_cb(int timeout, void *arg)
+
+static void router_timeout_cb(int timeout, void *arg)
 {
-    struct uvif *uv = (struct uvif *)arg;
+    struct iface *uv = (struct iface *)arg;
 
     logit(LOG_DEBUG, 0, "Querier %s timed out", inet_fmt(uv->uv_querier->al_addr, s1, sizeof(s1)));
     free(uv->uv_querier);
@@ -762,7 +754,7 @@ void router_timeout_cb(int timeout, void *arg)
 static void group_version_cb(int timeout, void *arg)
 {
     cbk_t *cbk = (cbk_t *)arg;
-    struct uvif *uv;
+    struct iface *uv;
 
     uv = config_find_iface(cbk->ifi);
     if (!uv)
@@ -783,7 +775,7 @@ static void group_version_cb(int timeout, void *arg)
 }
 
 /*
- * Set a timer to switch version back on a vif.
+ * Set a timer to switch version back on an interface.
  */
 static int group_version_timer(int ifi, struct listaddr *g)
 {
@@ -802,13 +794,13 @@ static int group_version_timer(int ifi, struct listaddr *g)
 }
 
 /*
- * Time out record of a group membership on a vif
+ * Time out record of a group membership on an interface.
  */
 static void delete_group_cb(int timeout, void *arg)
 {
     cbk_t *cbk = (cbk_t *)arg;
     struct listaddr *g = cbk->g;
-    struct uvif *uv;
+    struct iface *uv;
 
     uv = config_find_iface(cbk->ifi);
     if (!uv)
@@ -832,7 +824,7 @@ static void delete_group_cb(int timeout, void *arg)
 }
 
 /*
- * Set a timer to delete the record of a group membership on a vif.
+ * Set a timer to delete the record of a group membership on an interface.
  */
 static int delete_group_timer(int ifi, struct listaddr *g, int tmo)
 {
@@ -859,7 +851,7 @@ static int delete_group_timer(int ifi, struct listaddr *g, int tmo)
 static void send_query_cb(int timeout, void *arg)
 {
     cbk_t *cbk = (cbk_t *)arg;
-    struct uvif *uv;
+    struct iface *uv;
 
     uv = config_find_iface(cbk->ifi);
     if (!uv)
