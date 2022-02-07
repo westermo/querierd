@@ -22,6 +22,7 @@ done
 ip addr add 192.168.0.1/24 dev eth0
 ip addr add 192.168.1.1/24 dev eth1
 ip addr add 192.168.1.2/24 dev eth1
+ip addr add 169.254.0.1/16 dev eth1
 ip addr add 192.168.3.1/24 dev eth1
 ip addr add 192.168.2.1/24 dev eth2
 
@@ -52,6 +53,13 @@ sleep 2
 kill_pids
 
 print "Analyzing pcap ..."
+echo "___________________________________________________"
+echo "eth0:"
+tshark -n -r "/tmp/$NM/eth0.pcap" 2>/dev/null
+echo "___________________________________________________"
+echo "eth1:"
+tshark -n -r "/tmp/$NM/eth1.pcap" 2>/dev/null
+echo "___________________________________________________"
 lines1=$(tshark -n -r "/tmp/$NM/eth0.pcap" 2>/dev/null | grep "IGMPv3 50 Membership Query" | tee -a "/tmp/$NM/result" | wc -l)
 lines2=$(tshark -n -r "/tmp/$NM/eth1.pcap" 2>/dev/null | grep "IGMPv3 50 Membership Query" | tee -a "/tmp/$NM/result" | wc -l)
 cat "/tmp/$NM/result"
