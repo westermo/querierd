@@ -39,7 +39,7 @@ echo $! >> "/tmp/$NM/PIDs"
 sleep 1
 
 print "Starting querierd ..."
-../src/querierd -f "/tmp/$NM/config" -l debug -n &
+../src/querierd -f "/tmp/$NM/config" -p "/tmp/$NM/pid" -l debug -n &
 echo $! >> "/tmp/$NM/PIDs"
 
 sleep 6
