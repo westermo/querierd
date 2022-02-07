@@ -156,7 +156,7 @@ extern int		igmp_debug_kind(uint32_t, uint32_t);
 extern void		iface_init(void);
 extern void		iface_zero(struct iface *);
 extern void		iface_check_state(void);
-extern void		iface_stop_all(void);
+extern void		iface_exit(void);
 extern void		accept_group_report(int, uint32_t, uint32_t, uint32_t, int);
 extern void		accept_leave_message(int, uint32_t, uint32_t, uint32_t);
 extern void		accept_membership_query(int, uint32_t, uint32_t, uint32_t, int, int);

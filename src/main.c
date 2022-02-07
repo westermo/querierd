@@ -271,7 +271,7 @@ static void cleanup(void)
     if (!in_cleanup) {
 	in_cleanup++;
 
-	iface_stop_all();
+	iface_exit();
 	igmp_exit();
     }
 }
@@ -308,7 +308,7 @@ void restart(void)
     /*
      * reset all the entries
      */
-    iface_stop_all();
+    iface_exit();
     igmp_exit();
 
     igmp_init();

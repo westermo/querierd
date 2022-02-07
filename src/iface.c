@@ -70,6 +70,36 @@ void iface_init(void)
     query_timerid = pev_timer_add(0, igmp_query_interval * 1000000, query_groups, NULL);
 }
 
+void iface_exit(void)
+{
+    struct listaddr *a, *tmp;
+    struct phaddr *ph;
+    struct iface *uv;
+
+    pev_timer_del(query_timerid);
+
+    for (uv = config_iface_iter(1); uv; uv = config_iface_iter(0)) {
+	if (uv->uv_querier) {
+	    free(uv->uv_querier);
+	    uv->uv_querier = NULL;
+	}
+
+	TAILQ_FOREACH_SAFE(a, &uv->uv_groups, al_link, tmp) {
+	    TAILQ_REMOVE(&uv->uv_groups, a, al_link);
+	    free(a);
+	}
+
+	while (uv->uv_addrs) {
+	    ph = uv->uv_addrs;
+	    uv->uv_addrs = ph->pa_next;
+	    free(ph);
+	}
+	uv->uv_addrs = NULL;
+
+	free(uv);
+    }
+}
+
 /*
  * Note: remember to re-init all relevant TAILQ's in iface_init()!
  */
@@ -208,37 +238,6 @@ static void stop_iface(struct iface *uv)
 
     logit(LOG_DEBUG, 0, "Releasing querier duties on interface %s", uv->uv_name);
     uv->uv_flags &= ~VIFF_QUERIER;
-}
-
-
-void iface_stop_all(void)
-{
-    struct listaddr *a, *tmp;
-    struct phaddr *ph;
-    struct iface *uv;
-
-    pev_timer_del(query_timerid);
-
-    for (uv = config_iface_iter(1); uv; uv = config_iface_iter(0)) {
-	if (uv->uv_querier) {
-	    free(uv->uv_querier);
-	    uv->uv_querier = NULL;
-	}
-
-	TAILQ_FOREACH_SAFE(a, &uv->uv_groups, al_link, tmp) {
-	    TAILQ_REMOVE(&uv->uv_groups, a, al_link);
-	    free(a);
-	}
-
-	while (uv->uv_addrs) {
-	    ph = uv->uv_addrs;
-	    uv->uv_addrs = ph->pa_next;
-	    free(ph);
-	}
-	uv->uv_addrs = NULL;
-
-	free(uv);
-    }
 }
 
 /*
