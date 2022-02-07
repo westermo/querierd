@@ -112,6 +112,15 @@ extern char		s4[MAX_INET_BUF_LEN];
 #define INADDR_MAX_LOCAL_GROUP	(uint32_t)0xe00000ff	/* 224.0.0.255 */
 #endif
 
+/*
+ * Checks if addr is IPv4LL
+ */
+#ifndef IN_LINKLOCAL
+#define IN_LINKLOCALNETNUM 0xa9fe0000
+#define IN_LINKLOCAL(addr) ((addr & IN_CLASSB_NET) == IN_LINKLOCALNETNUM)
+#endif
+
+
 /* main.c */
 extern char	       *ident;
 extern char	       *prognm;

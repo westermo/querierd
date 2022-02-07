@@ -196,6 +196,8 @@ void config_vifs_from_kernel(void)
      * Loop through all of the interfaces.
      */
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+	in_addr_t curr;
+
 	/*
 	 * Ignore any interface for an address family other than IP.
 	 */
@@ -227,6 +229,21 @@ void config_vifs_from_kernel(void)
 	    continue;
 	}
 
+	/*
+	 * Check if current address is better (RFC), make sure an IPv4LL
+	 * doesn't win, usually ppl want a real address if available.
+	 * 0.0.0.0 is reserved for proxy querys, which we cannot do, and
+	 * they must never win an election.
+	 */
+	curr = uv->uv_lcl_addr;
+	if (curr && ntohl(curr) < ntohl(addr)) {
+	    if (!IN_LINKLOCAL(ntohl(curr)) || IN_LINKLOCAL(ntohl(addr)))
+		continue;
+	    logit(LOG_DEBUG, 0, "interface %s, discarding current link-local %s ...",
+		  ifa->ifa_name, inet_fmt(curr, s1, sizeof(s1)));
+	}
+
+	logit(LOG_DEBUG, 0, "interface %s address %s", ifa->ifa_name, inet_fmt(addr, s1, sizeof(s1)));
 	uv->uv_lcl_addr    = addr;
 	uv->uv_subnet      = subnet;
 	uv->uv_subnetmask  = mask;
