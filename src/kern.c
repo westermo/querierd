@@ -108,7 +108,7 @@ void k_set_if(int ifi)
  */
 void k_join(uint32_t grp, int ifindex)
 {
-    struct ip_mreqn mreq;
+    struct ip_mreqn mreq = { 0 };
 
     mreq.imr_multiaddr.s_addr = grp;
     mreq.imr_ifindex = ifindex;
@@ -136,7 +136,7 @@ void k_join(uint32_t grp, int ifindex)
  */
 void k_leave(uint32_t grp, int ifindex)
 {
-    struct ip_mreqn mreq;
+    struct ip_mreqn mreq = { 0 };
 
     mreq.imr_multiaddr.s_addr = grp;
     mreq.imr_ifindex = ifindex;
