@@ -14,7 +14,7 @@ querierd_SOURCES  = main.c cfparse.y config.c		\
 		   defs.h dvmrp.h			\
 		   iface.c iface.h netlink.c		\
 		   igmp.c igmpv2.h igmpv3.h 		\
-		   inet.c kern.c log.c 			\
+		   inet.c ipc.c kern.c log.c 		\
 		   pev.c pev.h				\
 		   pathnames.h queue.h
 querierd_CPPFLAGS = $(AM_CPPFLAGS)

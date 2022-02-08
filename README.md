@@ -5,6 +5,12 @@ Bridge Querier Helper
 This daemon is a querier helper for the Linux bridge.  Currently only
 IGMP is supported, support for initiating MLD queries is planned.
 
+Basic IPC support available:
+
+    echo "help" |socat - UNIX-CONNECT:/run/querierd.sock
+
+> See `querierd -h` for help, e.g. to customize the IPC path.
+
 
 Configuration
 -------------

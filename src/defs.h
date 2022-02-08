@@ -51,6 +51,8 @@ typedef void (*ihfunc_t) (int);
 #include "pathnames.h"
 #include "pev.h"
 
+#define NELEMS(a)	(sizeof((a)) / sizeof((a)[0]))
+
 /*
  * External declarations for global variables and functions.
  */
@@ -129,11 +131,7 @@ extern const char      *versionstring;
 extern int		cache_lifetime;
 extern int		prune_lifetime;
 extern int		mrt_table_id;
-extern int              debug_list(int, char *, size_t);
-extern int              debug_parse(char *);
 extern void             restart(void);
-extern int		register_input_handler(int, ihfunc_t);
-extern void		deregister_input_handler(int);
 
 /* log.c */
 extern void             log_init(char *);
@@ -170,13 +168,13 @@ extern void             netlink_exit(void);
 
 /* config.c */
 extern void		config_set_ifflag(uint32_t);
-extern struct ifi     *config_iface_iter(int);
-extern struct ifi     *config_iface_add(char *);
+extern struct ifi      *config_iface_iter(int);
+extern struct ifi      *config_iface_add(char *);
 extern void             config_iface_addr_del(int, struct sockaddr *);
-extern struct ifi     *config_find_ifname(char *);
-extern struct ifi     *config_find_ifaddr(in_addr_t);
-extern struct ifi     *config_find_iface(int);
-extern struct ifi     *config_init_tunnel(in_addr_t, in_addr_t, uint32_t);
+extern struct ifi      *config_find_ifname(char *);
+extern struct ifi      *config_find_ifaddr(in_addr_t);
+extern struct ifi      *config_find_iface(int);
+extern struct ifi      *config_init_tunnel(in_addr_t, in_addr_t, uint32_t);
 extern void             config_iface_addr_add(int, struct sockaddr *, unsigned int);
 extern void		config_iface_from_kernel(void);
 
@@ -193,6 +191,10 @@ extern char            *inet_fmt(uint32_t, char *, size_t);
 extern char            *inet_fmts(uint32_t, uint32_t, char *, size_t);
 extern uint32_t		inet_parse(char *, int);
 extern int		inet_cksum(uint16_t *, uint32_t);
+
+/* ipc.c */
+extern void             ipc_init(char *);
+extern void             ipc_exit(void);
 
 /* kern.c */
 extern int              curttl;

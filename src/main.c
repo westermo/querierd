@@ -23,13 +23,6 @@ char *ident       = PACKAGE_NAME;
 char *prognm      = NULL;
 const char *versionstring = "querierd version " PACKAGE_VERSION;
 
-#define NHANDLERS	5
-static struct ihandler {
-    int fd;			/* File descriptor	*/
-    ihfunc_t func;		/* Function to call	*/
-} ihandlers[NHANDLERS];
-static int nhandlers = 0;
-
 /*
  * Forward declarations.
  */
@@ -39,46 +32,9 @@ static int  check_signals(void);
 static int  timeout(int);
 static void cleanup(void);
 
-int register_input_handler(int fd, ihfunc_t func)
-{
-    int i;
-
-    if (nhandlers >= NHANDLERS)
-	return -1;
-
-    for (i = 0; i < NHANDLERS; i++) {
-	if (ihandlers[i].func)
-	    continue;
-
-	ihandlers[i].fd   = fd;
-	ihandlers[i].func = func;
-	nhandlers++;
-
-	return 0;
-    }
-
-    return -1;
-}
-
-void deregister_input_handler(int fd)
-{
-    int i;
-
-    for (i = 0; i < NHANDLERS; i++) {
-	if (ihandlers[i].fd != fd)
-	    continue;
-
-	ihandlers[i].fd   = 0;
-	ihandlers[i].func = NULL;
-	nhandlers--;
-
-	return;
-    }
-}
-
 static int compose_paths(void)
 {
-    /* Default .conf file path: "/etc" + '/' + "pimd" + ".conf" */
+    /* Default .conf file path: "/etc" + '/' + "querierd" + ".conf" */
     if (!config_file) {
 	size_t len = strlen(SYSCONFDIR) + strlen(ident) + 7;
 
@@ -109,6 +65,7 @@ static int usage(int code)
 	   "  -n, --foreground         Run in foreground, do not detach from controlling terminal\n"
 	   "  -p, --pidfile=FILE       File to store process ID for signaling daemon, default ident\n"
 	   "  -s, --syslog             Log to syslog, default unless running in --foreground\n"
+	   "  -u, --ipc=FILE           Override UNIX domain socket, default from identity, -i\n"
 	   "  -v, --version            Show %s version\n", prognm, ident, PACKAGE_NAME, prognm);
 
     printf("\nBug report address: %-40s\n", PACKAGE_BUGREPORT);
@@ -142,6 +99,7 @@ int main(int argc, char *argv[])
 	{ "foreground",    0, 0, 'n' },
 	{ "pidfile",       1, 0, 'p' },
 	{ "syslog",        0, 0, 's' },
+	{ "ipc",           1, 0, 'u' },
 	{ "version",       0, 0, 'v' },
 	{ NULL, 0, 0, 0 }
     };
@@ -189,6 +147,10 @@ int main(int argc, char *argv[])
 
 	case 's':	/* --syslog */
 	    use_syslog++;
+	    break;
+
+	case 'u':
+	    sock_file = strdup(optarg);
 	    break;
 
 	case 'v':
@@ -258,6 +220,9 @@ int main(int argc, char *argv[])
     pev_sig_add(SIGUSR1, handle_signals, NULL);
     pev_sig_add(SIGUSR2, handle_signals, NULL);
 
+    /* Open channel to for client(s) */
+    ipc_init(sock_file);
+
     /* Signal world we are now ready to start taking calls */
     if (pidfile(pid_file))
 	logit(LOG_WARNING, errno, "Cannot create pidfile");
@@ -275,6 +240,7 @@ static void cleanup(void)
 	iface_exit();
 	igmp_exit();
 	netlink_exit();
+	ipc_exit();
     }
 }
 
@@ -313,10 +279,12 @@ void restart(void)
     iface_exit();
     igmp_exit();
     netlink_exit();
+    ipc_exit();
 
     igmp_init();
     netlink_init();
     iface_init();
+    ipc_init(sock_file);
 
     /* Touch PID file to acknowledge SIGHUP */
     pidfile(pid_file);
