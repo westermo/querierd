@@ -10,18 +10,16 @@
 
 struct iface {
     TAILQ_ENTRY(iface) uv_link;		/* link to next/prev interface       */
-    uint32_t	     uv_flags;	        /* VIFF_ flags defined below         */
-    uint32_t	     uv_lcl_addr;       /* local address of this interface   */
-    uint32_t	     uv_subnet;         /* subnet number         (phyints)   */
-    uint32_t	     uv_subnetmask;     /* subnet mask           (phyints)   */
-    uint32_t	     uv_subnetbcast;    /* subnet broadcast addr (phyints)   */
-    char	     uv_name[IFNAMSIZ]; /* interface name                    */
     TAILQ_HEAD(,listaddr) uv_static;    /* list of static groups (phyints)   */
     TAILQ_HEAD(,listaddr) uv_groups;    /* list of local groups  (phyints)   */
+    uint32_t	     uv_flags;	        /* VIFF_ flags defined below         */
+    char	     uv_name[IFNAMSIZ]; /* interface name                    */
+    int		     uv_ifindex;        /* Primarily for Linux systems       */
+    uint32_t	     uv_curr_addr;      /* Current address of this interface */
+    uint32_t	     uv_prev_addr;      /* Previous address of this interace */
+    struct phaddr   *uv_addrs;	        /* Secondary addresses               */
     struct listaddr *uv_querier;        /* IGMP querier (one or none)        */
     int		     uv_igmpv1_warn;    /* To rate-limit IGMPv1 warnings     */
-    struct phaddr   *uv_addrs;	        /* Secondary addresses               */
-    int		     uv_ifindex;        /* Primarily for Linux systems       */
 };
 
 #define VIFF_DOWN		0x000100	/* kernel state of interface */
@@ -32,9 +30,7 @@ struct iface {
 
 struct phaddr {
     struct phaddr   *pa_next;
-    uint32_t	     pa_subnet;		/* extra subnet			*/
-    uint32_t	     pa_subnetmask;	/* netmask of extra subnet	*/
-    uint32_t	     pa_subnetbcast;	/* broadcast of extra subnet	*/
+    uint32_t	     pa_addr;
 };
 
 struct listaddr {

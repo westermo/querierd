@@ -44,7 +44,6 @@ void iface_init(void)
 
     config_iface_from_file();
     config_iface_from_kernel();
-    config_iface_correlate();
 
     for (uv = config_iface_iter(1); uv; uv = config_iface_iter(0)) {
 	if (uv->uv_flags & VIFF_DISABLED) {
@@ -53,7 +52,7 @@ void iface_init(void)
 	}
 
 	if (uv->uv_flags & VIFF_DOWN) {
-	    logit(LOG_INFO, 0, "%s is not yet up; interface not in service", uv->uv_name);
+	    logit(LOG_INFO, 0, "%s is not yet up; skipping", uv->uv_name);
 	    continue;
 	}
 
@@ -106,16 +105,100 @@ void iface_exit(void)
 void iface_zero(struct iface *uv)
 {
     uv->uv_flags	= VIFF_DISABLED;
-    uv->uv_lcl_addr	= 0;
-    uv->uv_subnet	= 0;
-    uv->uv_subnetmask	= 0;
-    uv->uv_subnetbcast	= 0;
+    uv->uv_curr_addr	= 0;
     uv->uv_name[0]	= '\0';
     TAILQ_INIT(&uv->uv_static);
     TAILQ_INIT(&uv->uv_groups);
     uv->uv_querier	= NULL;
     uv->uv_igmpv1_warn	= 0;
     uv->uv_addrs	= NULL;
+}
+
+/*
+ * Restart IGMP Querier election
+ *
+ * Start by figuring out the best local address for the iface.  Check if
+ * the current address is better (RFC), make sure an IPv4LL doesn't win.
+ * Usually we want a real address if available.  0.0.0.0 is reserved for
+ * proxy querys, which we cannot do on a plain UDP socket, and they must
+ * never win an election.  (Proxy queries should be sent by the bridge.)
+ */
+void iface_check_election(struct iface *uv)
+{
+    in_addr_t curr = uv->uv_curr_addr;
+    struct phaddr *pa;
+
+    for (pa = uv->uv_addrs; pa; pa = pa->pa_next) {
+	in_addr_t cand = pa->pa_addr;
+
+	logit(LOG_DEBUG, 0, "    candidate address %s ...", inet_fmt(cand, s1, sizeof(s1)));
+	if (curr) {
+	    if (ntohl(cand) >= ntohl(curr))
+		continue;
+	    if (IN_LINKLOCAL(ntohl(cand)))
+		continue;
+	}
+
+	curr = cand;
+    }
+
+    if (curr != uv->uv_curr_addr) {
+	logit(LOG_INFO, 0, "Using %s address %s", uv->uv_name, inet_fmt(curr, s1, sizeof(s1)));
+	uv->uv_prev_addr = uv->uv_curr_addr;
+	uv->uv_curr_addr = curr;
+    }
+
+    if (uv->uv_querier) {
+	uint32_t cur = uv->uv_querier->al_addr;
+
+	if (ntohl(uv->uv_curr_addr) < ntohl(cur)) {
+	    logit(LOG_DEBUG, 0, "New local querier on %s", uv->uv_name);
+	    pev_timer_del(uv->uv_querier->al_timerid);
+	    free(uv->uv_querier);
+	    uv->uv_querier = NULL;
+	    goto elected;
+	}
+    } else {
+	if (uv->uv_prev_addr == 0)
+	    goto elected;
+    }
+
+    return;
+
+  elected:
+    /*
+     * Until (new) neighbors are discovered, assume responsibility for
+     * sending periodic group membership queries to the subnet.  Send
+     * the first query.
+     */
+    uv->uv_flags |= VIFF_QUERIER;
+    logit(LOG_DEBUG, 0, "Assuming querier duties on interface %s", uv->uv_name);
+    send_query(uv, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
+}
+
+void iface_check(int ifi, unsigned int flags)
+{
+    struct iface *uv;
+
+    uv = config_find_iface(ifi);
+    if (!uv) {
+	logit(LOG_DEBUG, 0, "Cannot find ifi %d in configuration, skipping ...", ifi);
+	return;
+    }
+
+    if (uv->uv_flags & VIFF_DOWN) {
+	if (flags & IFF_UP) {
+	    logit(LOG_NOTICE, 0, "%s has come up; interface now in service", uv->uv_name);
+	    uv->uv_flags &= ~VIFF_DOWN;
+	    start_iface(uv);
+	}
+    } else {
+	if (!(flags & IFF_UP)) {
+	    logit(LOG_NOTICE, 0, "%s has gone down; interface out of service", uv->uv_name);
+	    stop_iface(uv);
+	    uv->uv_flags |= VIFF_DOWN;
+	}
+    }
 }
 
 /*
@@ -143,19 +226,7 @@ void iface_check_state(void)
 	if (ioctl(igmp_socket, SIOCGIFFLAGS, &ifr) < 0)
 	    logit(LOG_ERR, errno, "Failed ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
 
-	if (uv->uv_flags & VIFF_DOWN) {
-	    if (ifr.ifr_flags & IFF_UP) {
-		logit(LOG_NOTICE, 0, "%s has come up; interface now in service", uv->uv_name);
-		uv->uv_flags &= ~VIFF_DOWN;
-		start_iface(uv);
-	    }
-	} else {
-	    if (!(ifr.ifr_flags & IFF_UP)) {
-		logit(LOG_NOTICE, 0, "%s has gone down; interface out of service", uv->uv_name);
-		stop_iface(uv);
-		uv->uv_flags |= VIFF_DOWN;
-	    }
-	}
+	iface_check(uv->uv_ifindex, ifr.ifr_flags);
     }
 
     checking_iface = 0;
@@ -164,6 +235,19 @@ void iface_check_state(void)
 static void send_query(struct iface *v, uint32_t dst, int code, uint32_t group)
 {
     int datalen = 4;
+
+    if (!v->uv_curr_addr) {
+	/*
+	 * If we send with source address 0.0.0.0 on a UDP socket the
+	 * kernel will go dumpster diving to find a "suitable" address
+	 * from another interface.  Obviously we don't want that ... we
+	 * would've liked to be able to send a proxy query, but that's
+	 * not possible unless SOCK_RAW, so we delegate the proxy query
+	 * mechanism to the bridge and bail out here.
+	 */
+//	logit(LOG_DEBUG, 0, "Skipping send of query on %s, no address yet.", v->uv_name);
+	return;
+    }
 
     /*
      * IGMP version to send depends on the compatibility mode of the
@@ -185,7 +269,7 @@ static void send_query(struct iface *v, uint32_t dst, int code, uint32_t group)
 	  (v->uv_flags & VIFF_IGMPV2) ? "v2 " : "v3 ",
 	  v->uv_name);
 
-    send_igmp(v->uv_ifindex, v->uv_lcl_addr, dst, IGMP_MEMBERSHIP_QUERY,
+    send_igmp(v->uv_ifindex, v->uv_curr_addr, dst, IGMP_MEMBERSHIP_QUERY,
 	      code, group, datalen);
 }
 
@@ -204,14 +288,8 @@ static void start_iface(struct iface *uv)
     /* Join INADDR_ALLRPTS_GROUP to support IGMPv3 membership reports */
     k_join(allreports_group, uv->uv_ifindex);
 
-    /*
-     * Until neighbors are discovered, assume responsibility for sending
-     * periodic group membership queries to the subnet.  Send the first
-     * query.
-     */
-    uv->uv_flags |= VIFF_QUERIER;
-    logit(LOG_DEBUG, 0, "Assuming querier duties on interface %s", uv->uv_name);
-    send_query(uv, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
+    /* Check if we should assume the querier role */
+    iface_check_election(uv);
 }
 
 static void stop_iface(struct iface *uv)
@@ -294,7 +372,7 @@ void accept_membership_query(int ifi, uint32_t src, uint32_t dst, uint32_t group
     }
 
     if (uv->uv_querier == NULL || uv->uv_querier->al_addr != src) {
-	uint32_t cur = uv->uv_querier ? uv->uv_querier->al_addr : uv->uv_lcl_addr;
+	uint32_t cur = uv->uv_querier ? uv->uv_querier->al_addr : uv->uv_curr_addr;
 
 	/*
 	 * This might be:
@@ -347,7 +425,7 @@ void accept_membership_query(int ifi, uint32_t src, uint32_t dst, uint32_t group
      * the [Max Response Time] in the packet.
      */
     if (!(uv->uv_flags & (VIFF_IGMPV1|VIFF_QUERIER))
-	&& group != 0 && src != uv->uv_lcl_addr) {
+	&& group != 0 && src != uv->uv_curr_addr) {
 	struct listaddr *g;
 
 	logit(LOG_DEBUG, 0, "Group-specific membership query for %s from %s on %s, timer %d",
@@ -734,12 +812,12 @@ void accept_membership_report(int ifi, uint32_t src, uint32_t dst, struct igmpv3
 /*
  * When an active querier times out we assume the role here.
  */
-
 static void router_timeout_cb(int timeout, void *arg)
 {
     struct iface *uv = (struct iface *)arg;
 
     logit(LOG_DEBUG, 0, "Querier %s timed out", inet_fmt(uv->uv_querier->al_addr, s1, sizeof(s1)));
+    pev_timer_del(uv->uv_querier->al_timerid);
     free(uv->uv_querier);
     uv->uv_querier = NULL;
 

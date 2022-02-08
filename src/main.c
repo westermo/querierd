@@ -249,6 +249,7 @@ int main(int argc, char *argv[])
 
     pev_init();
     igmp_init();
+    netlink_init();
     iface_init();
 
     pev_sig_add(SIGHUP,  handle_signals, NULL);
@@ -273,6 +274,7 @@ static void cleanup(void)
 
 	iface_exit();
 	igmp_exit();
+	netlink_exit();
     }
 }
 
@@ -310,8 +312,10 @@ void restart(void)
      */
     iface_exit();
     igmp_exit();
+    netlink_exit();
 
     igmp_init();
+    netlink_init();
     iface_init();
 
     /* Touch PID file to acknowledge SIGHUP */

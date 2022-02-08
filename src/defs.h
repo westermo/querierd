@@ -155,12 +155,18 @@ extern int		igmp_debug_kind(uint32_t, uint32_t);
 /* iface.c */
 extern void		iface_init(void);
 extern void		iface_zero(struct iface *);
+extern void             iface_check_election(struct iface *);
+extern void             iface_check(int, unsigned int);
 extern void		iface_check_state(void);
 extern void		iface_exit(void);
 extern void		accept_group_report(int, uint32_t, uint32_t, uint32_t, int);
 extern void		accept_leave_message(int, uint32_t, uint32_t, uint32_t);
 extern void		accept_membership_query(int, uint32_t, uint32_t, uint32_t, int, int);
 extern void             accept_membership_report(int, uint32_t, uint32_t, struct igmpv3_report *, ssize_t);
+
+/* netlink.c */
+extern void             netlink_init(void);
+extern void             netlink_exit(void);
 
 /* config.c */
 extern void		config_set_ifflag(uint32_t flag);
@@ -170,7 +176,7 @@ extern struct iface     *config_find_ifname(char *nm);
 extern struct iface     *config_find_ifaddr(in_addr_t addr);
 extern struct iface     *config_find_iface(int ifindex);
 extern struct iface     *config_init_tunnel(in_addr_t lcl_addr, in_addr_t rmt_addr, uint32_t flags);
-extern void		config_iface_correlate(void);
+extern void             config_iface_addr_add(int, struct sockaddr *, unsigned int);
 extern void		config_iface_from_kernel(void);
 
 /* cfparse.y */

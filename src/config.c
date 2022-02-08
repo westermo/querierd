@@ -57,7 +57,7 @@ struct iface *config_find_ifaddr(in_addr_t addr)
     struct iface *uv;
 
     TAILQ_FOREACH(uv, &ifaces, uv_link) {
-	if (addr == uv->uv_lcl_addr)
+	if (addr == uv->uv_curr_addr)
             return uv;
     }
 
@@ -74,81 +74,6 @@ struct iface *config_find_iface(int ifi)
     }
 
     return NULL;
-}
-
-/*
- * Ignore any kernel interface that is disabled, or connected to the
- * same subnet as one already installed.
- */
-static int check_iface(struct iface *v)
-{
-    struct iface *uv;
-    vifi_t vifi;
-
-    TAILQ_FOREACH(uv, &ifaces, uv_link) {
-	if (v == uv)
-	    continue;
-
-	if (uv->uv_flags & VIFF_DISABLED) {
-	    logit(LOG_DEBUG, 0, "Skipping %s, disabled in configuration", uv->uv_name);
-	    return -1;
-	}
-
-	if (((v->uv_lcl_addr & uv->uv_subnetmask) == uv->uv_subnet && uv->uv_subnet) ||
-	    ((uv->uv_subnet  &  v->uv_subnetmask) ==  v->uv_subnet &&  v->uv_subnet)) {
-	    logit(LOG_WARNING, 0, "ignoring %s on %s, same subnet as %s",
-		  inet_fmt(v->uv_lcl_addr, s1, sizeof(s1)), v->uv_name, uv->uv_name);
-	    return -1;
-	}
-
-	/*
-	 * Same interface, add as secondary IP address (altnet)
-	 */
-	if (strcmp(v->uv_name, uv->uv_name) == 0) {
-	    struct phaddr *ph;
-
-	    ph = calloc(1, sizeof(*ph));
-	    if (!ph) {
-		logit(LOG_ERR, errno, "Failed allocating altnet on %s", uv->uv_name);
-		break;
-	    }
-
-	    logit(LOG_INFO, 0, "Installing %s subnet %s as an altnet on %s",
-		  v->uv_name,
-		  inet_fmts(v->uv_subnet, v->uv_subnetmask, s2, sizeof(s2)),
-		  uv->uv_name);
-
-	    ph->pa_subnet      = v->uv_subnet;
-	    ph->pa_subnetmask  = v->uv_subnetmask;
-	    ph->pa_subnetbcast = v->uv_subnetbcast;
-
-	    ph->pa_next = uv->uv_addrs;
-	    uv->uv_addrs = ph;
-	    return -1;
-	}
-    }
-
-    return 0;
-}
-
-void config_iface_correlate(void)
-{
-    struct listaddr *al, *al_tmp;
-    struct iface *uv, *v, *tmp;
-    vifi_t vifi;
-
-    TAILQ_FOREACH_SAFE(v, &ifaces, uv_link, tmp) {
-	if (check_iface(v)) {
-	    logit(LOG_DEBUG, 0, "Dropping interface %s ...", v->uv_name);
-	    TAILQ_REMOVE(&ifaces, v, uv_link);
-	    free(v);
-	    continue;
-	}
-
-	logit(LOG_INFO, 0, "Registered %s (%s on subnet %s) ifi %d",
-	      v->uv_name, inet_fmt(v->uv_lcl_addr, s1, sizeof(s1)),
-	      inet_fmts(v->uv_subnet, v->uv_subnetmask, s2, sizeof(s2)), v->uv_ifindex);
-    }
 }
 
 struct iface *config_iface_add(char *ifname)
@@ -177,79 +102,85 @@ struct iface *config_iface_add(char *ifname)
     return uv;
 }
 
+static struct iface *addr_add(int ifi, struct sockaddr *sa, unsigned int flags)
+{
+    struct sockaddr_in *sin = (struct sockaddr_in *)sa;
+    struct phaddr *pa;
+    struct iface *uv;
+
+    /*
+     * Ignore any interface for an address family other than IP
+     */
+    if (!sa || sa->sa_family != AF_INET)
+	return NULL;
+
+    /*
+     * Ignore loopback interfaces and interfaces that do not support
+     * multicast.
+     */
+    if ((flags & (IFF_LOOPBACK|IFF_MULTICAST)) != IFF_MULTICAST)
+	return NULL;
+
+    uv = config_find_iface(ifi);
+    if (!uv)
+	return NULL;
+
+    pa = calloc(1, sizeof(*pa));
+    if (!pa) {
+	logit(LOG_ERR, errno, "Failed allocating address for %s", uv->uv_name);
+	return NULL;
+    }
+
+    pa->pa_addr  = sin->sin_addr.s_addr;
+    pa->pa_next  = uv->uv_addrs;
+    uv->uv_addrs = pa;
+
+    if (!(flags & IFF_UP))
+	uv->uv_flags |= VIFF_DOWN;
+
+    logit(LOG_DEBUG, 0, "New address %s for %s flags %p",
+	  inet_fmt(pa->pa_addr, s1, sizeof(s1)), uv->uv_name, flags);
+
+    return uv;
+}
+
+void config_iface_addr_add(int ifi, struct sockaddr *sa, unsigned int flags)
+{
+    struct iface *uv;
+
+    uv = addr_add(ifi, sa, flags);
+    if (uv) {
+	if (uv->uv_flags & VIFF_DISABLED) {
+	    logit(LOG_DEBUG, 0, "    %s disabled, no election", uv->uv_name);
+	    return;
+	}
+	if (uv->uv_flags & VIFF_DOWN) {
+	    logit(LOG_DEBUG, 0, "    %s down, no election", uv->uv_name);
+	    return;
+	}
+
+	iface_check_election(uv);
+    }
+}
+
 /*
  * Query the kernel to find network interfaces that are multicast-capable
  */
 void config_iface_from_kernel(void)
 {
-    in_addr_t addr, mask, subnet;
     struct ifaddrs *ifa, *ifap;
-    struct iface *uv;
-    vifi_t vifi;
-    int flags;
 
     if (getifaddrs(&ifap) < 0)
 	logit(LOG_ERR, errno, "getifaddrs");
 
-    /*
-     * Loop through all of the interfaces.
-     */
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-	in_addr_t curr;
+	int ifi;
 
-	/*
-	 * Ignore any interface for an address family other than IP.
-	 */
-	if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET)
+	ifi = if_nametoindex(ifa->ifa_name);
+	if (!ifi)
 	    continue;
 
-	/*
-	 * Ignore loopback interfaces and interfaces that do not support
-	 * multicast.
-	 */
-	flags = ifa->ifa_flags;
-	if ((flags & (IFF_LOOPBACK|IFF_MULTICAST)) != IFF_MULTICAST)
-	    continue;
-
-	uv = config_find_ifname(ifa->ifa_name);
-	if (!uv)
-	    continue;
-
-	/*
-	 * Perform some sanity checks on the address and subnet, ignore any
-	 * interface whose address and netmask do not define a valid subnet.
-	 */
-	addr = ((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr;
-	mask = ((struct sockaddr_in *)ifa->ifa_netmask)->sin_addr.s_addr;
-	subnet = addr & mask;
-	if (!inet_valid_subnet(subnet, mask) || (addr != subnet && addr == (subnet & ~mask))) {
-	    logit(LOG_WARNING, 0, "ignoring %s, has invalid address (%s) and/or mask (%s)",
-		  ifa->ifa_name, inet_fmt(addr, s1, sizeof(s1)), inet_fmt(mask, s2, sizeof(s2)));
-	    continue;
-	}
-
-	/*
-	 * Check if current address is better (RFC), make sure an IPv4LL
-	 * doesn't win, usually ppl want a real address if available.
-	 * 0.0.0.0 is reserved for proxy querys, which we cannot do, and
-	 * they must never win an election.
-	 */
-	curr = uv->uv_lcl_addr;
-	if (curr && ntohl(curr) < ntohl(addr)) {
-	    if (!IN_LINKLOCAL(ntohl(curr)) || IN_LINKLOCAL(ntohl(addr)))
-		continue;
-	    logit(LOG_DEBUG, 0, "interface %s, discarding current link-local %s ...",
-		  ifa->ifa_name, inet_fmt(curr, s1, sizeof(s1)));
-	}
-
-	logit(LOG_DEBUG, 0, "interface %s address %s", ifa->ifa_name, inet_fmt(addr, s1, sizeof(s1)));
-	uv->uv_lcl_addr    = addr;
-	uv->uv_subnet      = subnet;
-	uv->uv_subnetmask  = mask;
-	uv->uv_subnetbcast = subnet | ~mask;
-
-	if (!(flags & IFF_UP))
-	    uv->uv_flags |= VIFF_DOWN;
+	addr_add(ifi, ifa->ifa_addr, ifa->ifa_flags);
     }
 
     freeifaddrs(ifap);
