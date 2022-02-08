@@ -37,6 +37,8 @@ static void netlink_read(int sd, void *arg)
 
 			if (nlh->nlmsg_type == RTM_NEWADDR)
 			    config_iface_addr_add(ifa->ifa_index, (struct sockaddr *)&sin, flags);
+			else
+			    config_iface_addr_del(ifa->ifa_index, (struct sockaddr *)&sin);
 #else // debug
                         char name[IFNAMSIZ];
                         char addr[INET_ADDRSTRLEN];

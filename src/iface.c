@@ -72,7 +72,7 @@ void iface_init(void)
 void iface_exit(void)
 {
     struct listaddr *a, *tmp;
-    struct phaddr *ph;
+    struct phaddr *pa, *pat;
     struct iface *uv;
 
     pev_timer_del(query_timerid);
@@ -88,12 +88,10 @@ void iface_exit(void)
 	    free(a);
 	}
 
-	while (uv->uv_addrs) {
-	    ph = uv->uv_addrs;
-	    uv->uv_addrs = ph->pa_next;
-	    free(ph);
+	TAILQ_FOREACH_SAFE(pa, &uv->uv_addrs, pa_link, pat) {
+	    TAILQ_REMOVE(&uv->uv_addrs, pa, pa_link);
+	    free(pa);
 	}
-	uv->uv_addrs = NULL;
 
 	free(uv);
     }
@@ -109,9 +107,9 @@ void iface_zero(struct iface *uv)
     uv->uv_name[0]	= '\0';
     TAILQ_INIT(&uv->uv_static);
     TAILQ_INIT(&uv->uv_groups);
+    TAILQ_INIT(&uv->uv_addrs);
     uv->uv_querier	= NULL;
     uv->uv_igmpv1_warn	= 0;
-    uv->uv_addrs	= NULL;
 }
 
 /*
@@ -125,10 +123,10 @@ void iface_zero(struct iface *uv)
  */
 void iface_check_election(struct iface *uv)
 {
-    in_addr_t curr = uv->uv_curr_addr;
+    in_addr_t curr = 0;
     struct phaddr *pa;
 
-    for (pa = uv->uv_addrs; pa; pa = pa->pa_next) {
+    TAILQ_FOREACH(pa, &uv->uv_addrs, pa_link) {
 	in_addr_t cand = pa->pa_addr;
 
 	logit(LOG_DEBUG, 0, "    candidate address %s ...", inet_fmt(cand, s1, sizeof(s1)));
@@ -188,13 +186,13 @@ void iface_check(int ifi, unsigned int flags)
 
     if (uv->uv_flags & VIFF_DOWN) {
 	if (flags & IFF_UP) {
-	    logit(LOG_NOTICE, 0, "%s has come up; interface now in service", uv->uv_name);
+	    logit(LOG_INFO, 0, "%s has come up; interface now in service", uv->uv_name);
 	    uv->uv_flags &= ~VIFF_DOWN;
 	    start_iface(uv);
 	}
     } else {
 	if (!(flags & IFF_UP)) {
-	    logit(LOG_NOTICE, 0, "%s has gone down; interface out of service", uv->uv_name);
+	    logit(LOG_INFO, 0, "%s has gone down; interface out of service", uv->uv_name);
 	    stop_iface(uv);
 	    uv->uv_flags |= VIFF_DOWN;
 	}

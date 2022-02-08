@@ -12,12 +12,12 @@ struct iface {
     TAILQ_ENTRY(iface) uv_link;		/* link to next/prev interface       */
     TAILQ_HEAD(,listaddr) uv_static;    /* list of static groups (phyints)   */
     TAILQ_HEAD(,listaddr) uv_groups;    /* list of local groups  (phyints)   */
+    TAILQ_HEAD(,phaddr) uv_addrs;	/* Secondary addresses               */
     uint32_t	     uv_flags;	        /* VIFF_ flags defined below         */
     char	     uv_name[IFNAMSIZ]; /* interface name                    */
     int		     uv_ifindex;        /* Primarily for Linux systems       */
     uint32_t	     uv_curr_addr;      /* Current address of this interface */
     uint32_t	     uv_prev_addr;      /* Previous address of this interace */
-    struct phaddr   *uv_addrs;	        /* Secondary addresses               */
     struct listaddr *uv_querier;        /* IGMP querier (one or none)        */
     int		     uv_igmpv1_warn;    /* To rate-limit IGMPv1 warnings     */
 };
@@ -29,8 +29,8 @@ struct iface {
 #define	VIFF_IGMPV2		0x001000	/* Act as an IGMPv2 Router   */
 
 struct phaddr {
-    struct phaddr   *pa_next;
-    uint32_t	     pa_addr;
+    TAILQ_ENTRY(phaddr) pa_link;
+    uint32_t	        pa_addr;
 };
 
 struct listaddr {

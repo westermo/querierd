@@ -172,6 +172,7 @@ extern void             netlink_exit(void);
 extern void		config_set_ifflag(uint32_t flag);
 extern struct iface     *config_iface_iter(int first);
 extern struct iface     *config_iface_add(char *ifname);
+extern void             config_iface_addr_del(int ifi, struct sockaddr *sa);
 extern struct iface     *config_find_ifname(char *nm);
 extern struct iface     *config_find_ifaddr(in_addr_t addr);
 extern struct iface     *config_find_iface(int ifindex);

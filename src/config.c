@@ -125,6 +125,12 @@ static struct iface *addr_add(int ifi, struct sockaddr *sa, unsigned int flags)
     if (!uv)
 	return NULL;
 
+    /* kernel promotes secondary addresses, we know all addrs already */
+    TAILQ_FOREACH(pa, &uv->uv_addrs, pa_link) {
+	if (pa->pa_addr == sin->sin_addr.s_addr)
+	    return NULL;	/* Already have it */
+    }
+
     pa = calloc(1, sizeof(*pa));
     if (!pa) {
 	logit(LOG_ERR, errno, "Failed allocating address for %s", uv->uv_name);
@@ -132,8 +138,7 @@ static struct iface *addr_add(int ifi, struct sockaddr *sa, unsigned int flags)
     }
 
     pa->pa_addr  = sin->sin_addr.s_addr;
-    pa->pa_next  = uv->uv_addrs;
-    uv->uv_addrs = pa;
+    TAILQ_INSERT_TAIL(&uv->uv_addrs, pa, pa_link);
 
     if (!(flags & IFF_UP))
 	uv->uv_flags |= VIFF_DOWN;
@@ -144,11 +149,60 @@ static struct iface *addr_add(int ifi, struct sockaddr *sa, unsigned int flags)
     return uv;
 }
 
+static struct iface *addr_del(int ifi, struct sockaddr *sa)
+{
+    struct sockaddr_in *sin = (struct sockaddr_in *)sa;
+    struct phaddr *pa, *tmp;
+    struct iface *uv;
+
+    /*
+     * Ignore any interface for an address family other than IP
+     */
+    if (!sa || sa->sa_family != AF_INET)
+	return NULL;
+
+    uv = config_find_iface(ifi);
+    if (!uv)
+	return NULL;
+
+    TAILQ_FOREACH_SAFE(pa, &uv->uv_addrs, pa_link, tmp) {
+	if (pa->pa_addr != sin->sin_addr.s_addr)
+	    continue;
+
+	TAILQ_REMOVE(&uv->uv_addrs, pa, pa_link);
+	logit(LOG_DEBUG, 0, "Drop address %s for %s", inet_fmt(pa->pa_addr, s1, sizeof(s1)),
+	      uv->uv_name);
+	free(pa);
+	return uv;
+    }
+
+    return NULL;
+}
+
 void config_iface_addr_add(int ifi, struct sockaddr *sa, unsigned int flags)
 {
     struct iface *uv;
 
     uv = addr_add(ifi, sa, flags);
+    if (uv) {
+	if (uv->uv_flags & VIFF_DISABLED) {
+	    logit(LOG_DEBUG, 0, "    %s disabled, no election", uv->uv_name);
+	    return;
+	}
+	if (uv->uv_flags & VIFF_DOWN) {
+	    logit(LOG_DEBUG, 0, "    %s down, no election", uv->uv_name);
+	    return;
+	}
+
+	iface_check_election(uv);
+    }
+}
+
+void config_iface_addr_del(int ifi, struct sockaddr *sa)
+{
+    struct iface *uv;
+
+    uv = addr_del(ifi, sa);
     if (uv) {
 	if (uv->uv_flags & VIFF_DISABLED) {
 	    logit(LOG_DEBUG, 0, "    %s disabled, no election", uv->uv_name);
