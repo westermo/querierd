@@ -15,8 +15,6 @@ typedef struct {
     int    num;
 } cbk_t;
 
-static int query_timerid = -1;
-
 /*
  * Forward declarations.
  */
@@ -59,14 +57,6 @@ void iface_init(void)
 	logit(LOG_DEBUG, 0, "starting %s; interface now in service", ifi->ifi_name);
 	start_iface(ifi);
     }
-
-    /*
-     * Periodically query for local group memberships on all subnets for
-     * which this router is the elected querier.
-     */
-    if (query_timerid > 0)
-	pev_timer_del(query_timerid);
-    query_timerid = pev_timer_add(0, igmp_query_interval * 1000000, query_groups, NULL);
 }
 
 void iface_exit(void)
@@ -75,9 +65,9 @@ void iface_exit(void)
     struct phaddr *pa, *pat;
     struct ifi *ifi;
 
-    pev_timer_del(query_timerid);
-
     for (ifi = config_iface_iter(1); ifi; ifi = config_iface_iter(0)) {
+	stop_iface(ifi);
+
 	if (ifi->ifi_querier) {
 	    free(ifi->ifi_querier);
 	    ifi->ifi_querier = NULL;
@@ -109,7 +99,8 @@ void iface_zero(struct ifi *ifi)
     TAILQ_INIT(&ifi->ifi_groups);
     TAILQ_INIT(&ifi->ifi_addrs);
     ifi->ifi_querier	= NULL;
-    ifi->ifi_igmpv1_warn	= 0;
+    ifi->ifi_timerid	= 0;
+    ifi->ifi_igmpv1_warn = 0;
 }
 
 /*
@@ -184,6 +175,7 @@ void iface_check(int ifindex, unsigned int flags)
 	return;
     }
 
+    logit(LOG_DEBUG, 0, "Check %s known flags %p new flags %p", ifi->ifi_name, ifi->ifi_flags, flags);
     if (ifi->ifi_flags & VIFF_DOWN) {
 	if (flags & IFF_UP) {
 	    logit(LOG_INFO, 0, "%s has come up; interface now in service", ifi->ifi_name);
@@ -286,13 +278,29 @@ static void start_iface(struct ifi *ifi)
     /* Join INADDR_ALLRPTS_GROUP to support IGMPv3 membership reports */
     k_join(allreports_group, ifi->ifi_ifindex);
 
-    /* Check if we should assume the querier role */
+    /*
+     * Periodically query for local group memberships.
+     */
+    if (ifi->ifi_timerid > 0)
+	pev_timer_del(ifi->ifi_timerid);
+    ifi->ifi_timerid = pev_timer_add(0, igmp_query_interval * 1000000, query_groups, ifi);
+
+    /*
+     * Check if we should assume the querier role
+     */
     iface_check_election(ifi);
 }
 
 static void stop_iface(struct ifi *ifi)
 {
     struct listaddr *a, *tmp;
+
+    /*
+     * Stop query timer
+     */
+    if (ifi->ifi_timerid > 0)
+        pev_timer_del(ifi->ifi_timerid);
+    ifi->ifi_timerid = 0;
 
     /*
      * Discard all group addresses.  (No need to tell kernel;
@@ -327,16 +335,13 @@ static void stop_iface(struct ifi *ifi)
  */
 static void query_groups(int period, void *arg)
 {
-    struct ifi *ifi;
-    int ifindex;
+    struct ifi *ifi = (struct ifi *)arg;
 
-    for (ifi = config_iface_iter(1); ifi; ifi = config_iface_iter(0)) {
-	if (ifi->ifi_flags & (VIFF_DOWN | VIFF_DISABLED))
-	    continue;
+    if (ifi->ifi_flags & (VIFF_DOWN | VIFF_DISABLED))
+	return;
 
-	if (ifi->ifi_flags & VIFF_QUERIER)
-	    send_query(ifi, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
-    }
+    if (ifi->ifi_flags & VIFF_QUERIER)
+	send_query(ifi, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
 }
 
 /*
