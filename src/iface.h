@@ -13,7 +13,7 @@ struct ifi {
     TAILQ_HEAD(,listaddr) ifi_static;    /* list of static groups (phyints)   */
     TAILQ_HEAD(,listaddr) ifi_groups;    /* list of local groups  (phyints)   */
     TAILQ_HEAD(,phaddr) ifi_addrs;	 /* Secondary addresses               */
-    uint32_t	     ifi_flags;	         /* VIFF_ flags defined below         */
+    uint32_t	     ifi_flags;	         /* IFIF_ flags defined below         */
     char	     ifi_name[IFNAMSIZ]; /* interface name                    */
     int		     ifi_ifindex;        /* Primarily for Linux systems       */
     uint32_t	     ifi_curr_addr;      /* Current address of this interface */
@@ -23,11 +23,11 @@ struct ifi {
     int		     ifi_igmpv1_warn;    /* To rate-limit IGMPv1 warnings     */
 };
 
-#define VIFF_DOWN		0x000100 /* kernel state of interface */
-#define VIFF_DISABLED		0x000200 /* administratively disabled */
-#define VIFF_QUERIER		0x000400 /* I am the subnet's querier */
-#define VIFF_IGMPV1		0x000800 /* Act as an IGMPv1 Router   */
-#define	VIFF_IGMPV2		0x001000 /* Act as an IGMPv2 Router   */
+#define IFIF_DOWN		0x000100 /* kernel state of interface */
+#define IFIF_DISABLED		0x000200 /* administratively disabled */
+#define IFIF_QUERIER		0x000400 /* I am the subnet's querier */
+#define IFIF_IGMPV1		0x000800 /* Act as an IGMPv1 Router   */
+#define IFIF_IGMPV2		0x001000 /* Act as an IGMPv2 Router   */
 
 struct phaddr {
     TAILQ_ENTRY(phaddr) pa_link;

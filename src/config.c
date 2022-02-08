@@ -141,7 +141,7 @@ static struct ifi *addr_add(int ifindex, struct sockaddr *sa, unsigned int flags
     TAILQ_INSERT_TAIL(&ifi->ifi_addrs, pa, pa_link);
 
     if (!(flags & IFF_UP))
-	ifi->ifi_flags |= VIFF_DOWN;
+	ifi->ifi_flags |= IFIF_DOWN;
 
     logit(LOG_DEBUG, 0, "New address %s for %s flags %p",
 	  inet_fmt(pa->pa_addr, s1, sizeof(s1)), ifi->ifi_name, flags);
@@ -185,11 +185,11 @@ void config_iface_addr_add(int ifindex, struct sockaddr *sa, unsigned int flags)
 
     ifi = addr_add(ifindex, sa, flags);
     if (ifi) {
-	if (ifi->ifi_flags & VIFF_DISABLED) {
+	if (ifi->ifi_flags & IFIF_DISABLED) {
 	    logit(LOG_DEBUG, 0, "    %s disabled, no election", ifi->ifi_name);
 	    return;
 	}
-	if (ifi->ifi_flags & VIFF_DOWN) {
+	if (ifi->ifi_flags & IFIF_DOWN) {
 	    logit(LOG_DEBUG, 0, "    %s down, no election", ifi->ifi_name);
 	    return;
 	}
@@ -204,11 +204,11 @@ void config_iface_addr_del(int ifindex, struct sockaddr *sa)
 
     ifi = addr_del(ifindex, sa);
     if (ifi) {
-	if (ifi->ifi_flags & VIFF_DISABLED) {
+	if (ifi->ifi_flags & IFIF_DISABLED) {
 	    logit(LOG_DEBUG, 0, "    %s disabled, no election", ifi->ifi_name);
 	    return;
 	}
-	if (ifi->ifi_flags & VIFF_DOWN) {
+	if (ifi->ifi_flags & IFIF_DOWN) {
 	    logit(LOG_DEBUG, 0, "    %s down, no election", ifi->ifi_name);
 	    return;
 	}

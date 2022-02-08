@@ -60,7 +60,7 @@ stmts	: /* Empty */
 	;
 
 stmt	: error
-	| NO PHYINT		{ config_set_ifflag(VIFF_DISABLED); }
+	| NO PHYINT		{ config_set_ifflag(IFIF_DISABLED); }
 	| PHYINT STRING
 	{
 	    ifi = config_find_ifname($2);
@@ -115,11 +115,11 @@ ifmods	: /* empty */
 	| ifmods ifmod
 	;
 
-ifmod	: DISABLE		{ ifi->ifi_flags |= VIFF_DISABLED; }
-	| ENABLE		{ ifi->ifi_flags &= ~VIFF_DISABLED; }
-	| IGMPV1		{ ifi->ifi_flags &= ~VIFF_IGMPV2; ifi->ifi_flags |= VIFF_IGMPV1; }
-	| IGMPV2		{ ifi->ifi_flags &= ~VIFF_IGMPV1; ifi->ifi_flags |= VIFF_IGMPV2; }
-	| IGMPV3		{ ifi->ifi_flags &= ~VIFF_IGMPV1; ifi->ifi_flags &= ~VIFF_IGMPV2; }
+ifmod	: DISABLE		{ ifi->ifi_flags |= IFIF_DISABLED; }
+	| ENABLE		{ ifi->ifi_flags &= ~IFIF_DISABLED; }
+	| IGMPV1		{ ifi->ifi_flags &= ~IFIF_IGMPV2; ifi->ifi_flags |= IFIF_IGMPV1; }
+	| IGMPV2		{ ifi->ifi_flags &= ~IFIF_IGMPV1; ifi->ifi_flags |= IFIF_IGMPV2; }
+	| IGMPV3		{ ifi->ifi_flags &= ~IFIF_IGMPV1; ifi->ifi_flags &= ~IFIF_IGMPV2; }
 	| STATIC_GROUP GROUP
 	{
 	    struct listaddr *a;

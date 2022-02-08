@@ -44,12 +44,12 @@ void iface_init(void)
     config_iface_from_kernel();
 
     for (ifi = config_iface_iter(1); ifi; ifi = config_iface_iter(0)) {
-	if (ifi->ifi_flags & VIFF_DISABLED) {
+	if (ifi->ifi_flags & IFIF_DISABLED) {
 	    logit(LOG_INFO, 0, "%s is disabled; skipping", ifi->ifi_name);
 	    continue;
 	}
 
-	if (ifi->ifi_flags & VIFF_DOWN) {
+	if (ifi->ifi_flags & IFIF_DOWN) {
 	    logit(LOG_INFO, 0, "%s is not yet up; skipping", ifi->ifi_name);
 	    continue;
 	}
@@ -92,7 +92,7 @@ void iface_exit(void)
  */
 void iface_zero(struct ifi *ifi)
 {
-    ifi->ifi_flags	= VIFF_DISABLED;
+    ifi->ifi_flags	= IFIF_DISABLED;
     ifi->ifi_curr_addr	= 0;
     ifi->ifi_name[0]	= '\0';
     TAILQ_INIT(&ifi->ifi_static);
@@ -160,7 +160,7 @@ void iface_check_election(struct ifi *ifi)
      * sending periodic group membership queries to the subnet.  Send
      * the first query.
      */
-    ifi->ifi_flags |= VIFF_QUERIER;
+    ifi->ifi_flags |= IFIF_QUERIER;
     logit(LOG_DEBUG, 0, "Assuming querier duties on interface %s", ifi->ifi_name);
     send_query(ifi, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
 }
@@ -176,17 +176,17 @@ void iface_check(int ifindex, unsigned int flags)
     }
 
     logit(LOG_DEBUG, 0, "Check %s known flags %p new flags %p", ifi->ifi_name, ifi->ifi_flags, flags);
-    if (ifi->ifi_flags & VIFF_DOWN) {
+    if (ifi->ifi_flags & IFIF_DOWN) {
 	if (flags & IFF_UP) {
 	    logit(LOG_INFO, 0, "%s has come up; interface now in service", ifi->ifi_name);
-	    ifi->ifi_flags &= ~VIFF_DOWN;
+	    ifi->ifi_flags &= ~IFIF_DOWN;
 	    start_iface(ifi);
 	}
     } else {
 	if (!(flags & IFF_UP)) {
 	    logit(LOG_INFO, 0, "%s has gone down; interface out of service", ifi->ifi_name);
 	    stop_iface(ifi);
-	    ifi->ifi_flags |= VIFF_DOWN;
+	    ifi->ifi_flags |= IFIF_DOWN;
 	}
     }
 }
@@ -208,7 +208,7 @@ void iface_check_state(void)
 
     checking_iface = 1;
     for (ifi = config_iface_iter(1); ifi; ifi = config_iface_iter(0)) {
-	if (ifi->ifi_flags & VIFF_DISABLED)
+	if (ifi->ifi_flags & IFIF_DISABLED)
 	    continue;
 
 	memset(&ifr, 0, sizeof(ifr));
@@ -247,16 +247,16 @@ static void send_query(struct ifi *ifi, uint32_t dst, int code, uint32_t group)
      *  - IGMPv1: routers MUST send Periodic Queries with a Max Response
      *    Time of 0
      */
-    if (ifi->ifi_flags & VIFF_IGMPV2) {
+    if (ifi->ifi_flags & IFIF_IGMPV2) {
 	datalen = 0;
-    } else if (ifi->ifi_flags & VIFF_IGMPV1) {
+    } else if (ifi->ifi_flags & IFIF_IGMPV1) {
 	datalen = 0;
 	code = 0;
     }
 
     logit(LOG_DEBUG, 0, "Sending %squery on %s",
-	  (ifi->ifi_flags & VIFF_IGMPV1) ? "v1 " :
-	  (ifi->ifi_flags & VIFF_IGMPV2) ? "v2 " : "v3 ",
+	  (ifi->ifi_flags & IFIF_IGMPV1) ? "v1 " :
+	  (ifi->ifi_flags & IFIF_IGMPV2) ? "v2 " : "v3 ",
 	  ifi->ifi_name);
 
     send_igmp(ifi->ifi_ifindex, ifi->ifi_curr_addr, dst, IGMP_MEMBERSHIP_QUERY,
@@ -321,7 +321,7 @@ static void stop_iface(struct ifi *ifi)
     k_leave(allreports_group, ifi->ifi_ifindex);
 
     logit(LOG_DEBUG, 0, "Releasing querier duties on interface %s", ifi->ifi_name);
-    ifi->ifi_flags &= ~VIFF_QUERIER;
+    ifi->ifi_flags &= ~IFIF_QUERIER;
 }
 
 /*
@@ -337,10 +337,10 @@ static void query_groups(int period, void *arg)
 {
     struct ifi *ifi = (struct ifi *)arg;
 
-    if (ifi->ifi_flags & (VIFF_DOWN | VIFF_DISABLED))
+    if (ifi->ifi_flags & (IFIF_DOWN | IFIF_DISABLED))
 	return;
 
-    if (ifi->ifi_flags & VIFF_QUERIER)
+    if (ifi->ifi_flags & IFIF_QUERIER)
 	send_query(ifi, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
 }
 
@@ -357,8 +357,8 @@ void accept_membership_query(int ifindex, uint32_t src, uint32_t dst, uint32_t g
     if (!ifi)
 	return;
 
-    if ((ver == 3 && (ifi->ifi_flags & VIFF_IGMPV2)) ||
-	(ver == 2 && (ifi->ifi_flags & VIFF_IGMPV1))) {
+    if ((ver == 3 && (ifi->ifi_flags & IFIF_IGMPV2)) ||
+	(ver == 2 && (ifi->ifi_flags & IFIF_IGMPV1))) {
 	int i;
 
 	/*
@@ -370,7 +370,7 @@ void accept_membership_query(int ifindex, uint32_t src, uint32_t dst, uint32_t g
 
 	if (i == 1) {
 	    logit(LOG_WARNING, 0, "Received IGMPv%d report from %s on %s, configured for IGMPv%d",
-		  ver, inet_fmt(src, s1, sizeof(s1)), ifi->ifi_name, ifi->ifi_flags & VIFF_IGMPV1 ? 1 : 2);
+		  ver, inet_fmt(src, s1, sizeof(s1)), ifi->ifi_name, ifi->ifi_flags & IFIF_IGMPV1 ? 1 : 2);
 	}
     }
 
@@ -401,7 +401,7 @@ void accept_membership_query(int ifindex, uint32_t src, uint32_t dst, uint32_t g
 		    logit(LOG_ERR, errno, "%s(): Failed allocating memory", __func__);
 
 		ifi->ifi_querier->al_timerid = pev_timer_add(router_timeout * 1000000, 0, router_timeout_cb, ifi);
-		ifi->ifi_flags &= ~VIFF_QUERIER;
+		ifi->ifi_flags &= ~IFIF_QUERIER;
 	    }
 
 	    time(&ifi->ifi_querier->al_ctime);
@@ -427,7 +427,7 @@ void accept_membership_query(int ifindex, uint32_t src, uint32_t dst, uint32_t g
      * we must set our membership timer to [Last Member Query Count] *
      * the [Max Response Time] in the packet.
      */
-    if (!(ifi->ifi_flags & (VIFF_IGMPV1|VIFF_QUERIER))
+    if (!(ifi->ifi_flags & (IFIF_IGMPV1|IFIF_QUERIER))
 	&& group != 0 && src != ifi->ifi_curr_addr) {
 	struct listaddr *g;
 
@@ -606,7 +606,7 @@ void accept_leave_message(int ifindex, uint32_t src, uint32_t dst, uint32_t grou
     if (!ifi)
 	return;
 
-    if (!(ifi->ifi_flags & VIFF_QUERIER) || (ifi->ifi_flags & VIFF_IGMPV1)) {
+    if (!(ifi->ifi_flags & IFIF_QUERIER) || (ifi->ifi_flags & IFIF_IGMPV1)) {
 	logit(LOG_DEBUG, 0, "Ignoring group leave, not querier or interface in IGMPv1 mode.");
 	return;
     }
@@ -824,7 +824,7 @@ static void router_timeout_cb(int timeout, void *arg)
     free(ifi->ifi_querier);
     ifi->ifi_querier = NULL;
 
-    ifi->ifi_flags |= VIFF_QUERIER;
+    ifi->ifi_flags |= IFIF_QUERIER;
     send_query(ifi, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
 }
 
