@@ -5,7 +5,8 @@
 # Test runs for 15 seconds with a query interval of 5 sec.
 #
 # 1st interface behaves as "normal" one static address and up from the
-# start, we expect three queries from this interface.
+# start, we expect three queries from this interface.  However, we lose
+# the primary address, so expect to see .0.2 promoted.
 #
 # 2nd interface has a later arrival of an IP address, we expect two Q,
 # but might get three due to global query timer currently.
@@ -30,6 +31,7 @@ for iface in eth0 eth1 eth2; do
 done
 
 ip addr add 192.168.0.1/24 dev eth0
+ip addr add 192.168.0.2/24 dev eth0
 # no ip address at startup for eth1
 ip addr add 192.168.2.1/24 dev eth2
 
@@ -61,6 +63,7 @@ print "Starting querierd ..."
 echo $! >> "/tmp/$NM/PIDs"
 
 sleep 4
+ip addr del 192.168.0.1/24 dev eth0
 ip addr add 192.168.1.1/24 dev eth1
 sleep 4
 ip link set dev eth2 up
