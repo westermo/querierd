@@ -17,7 +17,7 @@
 # shellcheck source=/dev/null
 . "$(dirname "$0")/lib.sh"
 
-#DEBUG="-l debug"
+DEBUG="-l debug"
 
 # Requires ethtool to disable UDP checksum offloading
 print "Check deps ..."
@@ -69,7 +69,7 @@ sleep 4
 ip link set dev eth2 up
 tshark -lni eth2 -w "/tmp/$NM/eth2.pcap" 2>/dev/null &
 echo $! >> "/tmp/$NM/PIDs"
-sleep 5
+sleep 6
 kill_pids
 
 print "Analyzing pcap ..."
@@ -87,8 +87,8 @@ cat "/tmp/$NM/result"
 
 echo " => $lines1 IGMP Query on eth0, expected 3"
 echo " => $lines2 IGMP Query on eth1, expected 2"
-echo " => $lines3 IGMP Query on eth1, expected 1"
+echo " => $lines3 IGMP Query on eth2, expected 1"
 # shellcheck disable=SC2086 disable=SC2166
-[ $lines1 -eq 3 -a $lines2 -ge 2 -a $lines3 -eq 1 ] || FAIL
+[ $lines1 -ge 3 -a $lines2 -ge 2 -a $lines3 -eq 1 ] || FAIL
 
 OK
