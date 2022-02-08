@@ -154,8 +154,8 @@ extern int		igmp_debug_kind(uint32_t, uint32_t);
 
 /* iface.c */
 extern void		iface_init(void);
-extern void		iface_zero(struct iface *);
-extern void             iface_check_election(struct iface *);
+extern void		iface_zero(struct ifi *);
+extern void             iface_check_election(struct ifi *);
 extern void             iface_check(int, unsigned int);
 extern void		iface_check_state(void);
 extern void		iface_exit(void);
@@ -169,14 +169,14 @@ extern void             netlink_init(void);
 extern void             netlink_exit(void);
 
 /* config.c */
-extern void		config_set_ifflag(uint32_t flag);
-extern struct iface     *config_iface_iter(int first);
-extern struct iface     *config_iface_add(char *ifname);
-extern void             config_iface_addr_del(int ifi, struct sockaddr *sa);
-extern struct iface     *config_find_ifname(char *nm);
-extern struct iface     *config_find_ifaddr(in_addr_t addr);
-extern struct iface     *config_find_iface(int ifindex);
-extern struct iface     *config_init_tunnel(in_addr_t lcl_addr, in_addr_t rmt_addr, uint32_t flags);
+extern void		config_set_ifflag(uint32_t);
+extern struct ifi     *config_iface_iter(int);
+extern struct ifi     *config_iface_add(char *);
+extern void             config_iface_addr_del(int, struct sockaddr *);
+extern struct ifi     *config_find_ifname(char *);
+extern struct ifi     *config_find_ifaddr(in_addr_t);
+extern struct ifi     *config_find_iface(int);
+extern struct ifi     *config_init_tunnel(in_addr_t, in_addr_t, uint32_t);
 extern void             config_iface_addr_add(int, struct sockaddr *, unsigned int);
 extern void		config_iface_from_kernel(void);
 

@@ -27,8 +27,8 @@ static FILE *fp;
 
 static int lineno;
 
-static struct iface *v;
-static struct iface scrap;
+static struct ifi *ifi;
+static struct ifi scrap;
 
 %}
 
@@ -63,11 +63,11 @@ stmt	: error
 	| NO PHYINT		{ config_set_ifflag(VIFF_DISABLED); }
 	| PHYINT STRING
 	{
-	    v = config_find_ifname($2);
-	    if (!v) {
-		v = config_iface_add($2);
-		if (!v)
-		    v = &scrap;
+	    ifi = config_find_ifname($2);
+	    if (!ifi) {
+		ifi = config_iface_add($2);
+		if (!ifi)
+		    ifi = &scrap;
 	    }
 	}
 	ifmods
@@ -115,11 +115,11 @@ ifmods	: /* empty */
 	| ifmods ifmod
 	;
 
-ifmod	: DISABLE		{ v->uv_flags |= VIFF_DISABLED; }
-	| ENABLE		{ v->uv_flags &= ~VIFF_DISABLED; }
-	| IGMPV1		{ v->uv_flags &= ~VIFF_IGMPV2; v->uv_flags |= VIFF_IGMPV1; }
-	| IGMPV2		{ v->uv_flags &= ~VIFF_IGMPV1; v->uv_flags |= VIFF_IGMPV2; }
-	| IGMPV3		{ v->uv_flags &= ~VIFF_IGMPV1; v->uv_flags &= ~VIFF_IGMPV2; }
+ifmod	: DISABLE		{ ifi->ifi_flags |= VIFF_DISABLED; }
+	| ENABLE		{ ifi->ifi_flags &= ~VIFF_DISABLED; }
+	| IGMPV1		{ ifi->ifi_flags &= ~VIFF_IGMPV2; ifi->ifi_flags |= VIFF_IGMPV1; }
+	| IGMPV2		{ ifi->ifi_flags &= ~VIFF_IGMPV1; ifi->ifi_flags |= VIFF_IGMPV2; }
+	| IGMPV3		{ ifi->ifi_flags &= ~VIFF_IGMPV1; ifi->ifi_flags &= ~VIFF_IGMPV2; }
 	| STATIC_GROUP GROUP
 	{
 	    struct listaddr *a;
@@ -135,7 +135,7 @@ ifmod	: DISABLE		{ v->uv_flags |= VIFF_DISABLED; }
 	    a->al_flags = NBRF_STATIC_GROUP;
 	    time(&a->al_ctime);
 
-	    TAILQ_INSERT_TAIL(&v->uv_static, a, al_link);
+	    TAILQ_INSERT_TAIL(&ifi->ifi_static, a, al_link);
 	}
 	;
 
@@ -297,8 +297,8 @@ static int yylex(void)
 
 void config_iface_from_file(void)
 {
-    TAILQ_INIT(&scrap.uv_static);
-    TAILQ_INIT(&scrap.uv_groups);
+    TAILQ_INIT(&scrap.ifi_static);
+    TAILQ_INIT(&scrap.ifi_groups);
 
     lineno = 0;
 

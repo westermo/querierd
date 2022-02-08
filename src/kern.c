@@ -89,16 +89,16 @@ void k_set_ttl(int t)
 /*
  * Set the IP_MULTICAST_IF option on local interface ifa.
  */
-void k_set_if(int ifi)
+void k_set_if(int ifindex)
 {
     struct ip_mreqn imr = { 0 };
 
-    imr.imr_ifindex = ifi;
+    imr.imr_ifindex = ifindex;
     if (setsockopt(igmp_socket, IPPROTO_IP, IP_MULTICAST_IF, &imr, sizeof(imr)) < 0) {
         if (errno == EADDRNOTAVAIL || errno == EINVAL)
             return;
 
-        logit(LOG_ERR, errno, "Failed setting IP_MULTICAST_IF to ifidex %d", ifi);
+        logit(LOG_ERR, errno, "Failed setting IP_MULTICAST_IF to ifidex %d", ifindex);
     }
 }
 

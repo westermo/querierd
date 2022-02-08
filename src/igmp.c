@@ -140,7 +140,7 @@ static void igmp_read(int sd, void *arg)
     struct msghdr msgh;
     char cmbuf[0x100];
     struct iovec iov;
-    int ifi = -1;
+    int ifindex = -1;
     ssize_t len;
 
     memset(&msgh, 0, sizeof(msgh));
@@ -168,19 +168,19 @@ static void igmp_read(int sd, void *arg)
 	if (cmsg->cmsg_level != SOL_IP || cmsg->cmsg_type != IP_PKTINFO)
 	    continue;
 
-	ifi = ipi->ipi_ifindex;
+	ifindex = ipi->ipi_ifindex;
 	break;
 #endif
     }
 
-    accept_igmp(ifi, len);
+    accept_igmp(ifindex, len);
 }
 
 /*
  * Process a newly received IGMP packet that is sitting in the input
  * packet buffer.
  */
-void accept_igmp(int ifi, size_t recvlen)
+void accept_igmp(int ifindex, size_t recvlen)
 {
     struct igmp *igmp;
     struct ip *ip;
@@ -229,7 +229,7 @@ void accept_igmp(int ifi, size_t recvlen)
 
     logit(LOG_DEBUG, 0, "RECV %s from %-15s ifi %-2d to %s",
 	  igmp_packet_kind(igmp->igmp_type, igmp->igmp_code),
-	  inet_fmt(src, s1, sizeof(s1)), ifi, inet_fmt(dst, s2, sizeof(s2)));
+	  inet_fmt(src, s1, sizeof(s1)), ifindex, inet_fmt(dst, s2, sizeof(s2)));
 
     switch (igmp->igmp_type) {
 	case IGMP_MEMBERSHIP_QUERY:
@@ -245,16 +245,16 @@ void accept_igmp(int ifi, size_t recvlen)
 		logit(LOG_INFO, 0, "Received invalid IGMP query: Max Resp Code = %d, length = %d",
 		      igmp->igmp_code, ipdatalen);
 	    }
-	    accept_membership_query(ifi, src, dst, group, igmp->igmp_code, igmp_version);
+	    accept_membership_query(ifindex, src, dst, group, igmp->igmp_code, igmp_version);
 	    return;
 
 	case IGMP_V1_MEMBERSHIP_REPORT:
 	case IGMP_V2_MEMBERSHIP_REPORT:
-	    accept_group_report(ifi, src, dst, group, igmp->igmp_type);
+	    accept_group_report(ifindex, src, dst, group, igmp->igmp_type);
 	    return;
 
 	case IGMP_V2_LEAVE_GROUP:
-	    accept_leave_message(ifi, src, dst, group);
+	    accept_leave_message(ifindex, src, dst, group);
 	    return;
 
 	case IGMP_V3_MEMBERSHIP_REPORT:
@@ -263,7 +263,7 @@ void accept_igmp(int ifi, size_t recvlen)
 		      igmpdatalen, IGMP_V3_GROUP_RECORD_MIN_SIZE);
 		return;
 	    }
-	    accept_membership_report(ifi, src, dst, (struct igmpv3_report *)(recv_buf + iphdrlen), recvlen - iphdrlen);
+	    accept_membership_report(ifindex, src, dst, (struct igmpv3_report *)(recv_buf + iphdrlen), recvlen - iphdrlen);
 	    return;
 
 	default:
@@ -417,7 +417,7 @@ size_t build_igmp(uint32_t src, uint32_t dst, int type, int code, uint32_t group
  * Then send the message from the interface with IP address 'src' to
  * destination 'dst'.
  */
-void send_igmp(int ifi, uint32_t src, uint32_t dst, int type, int code, uint32_t group, int datalen)
+void send_igmp(int ifindex, uint32_t src, uint32_t dst, int type, int code, uint32_t group, int datalen)
 {
     struct sockaddr_in sin;
     struct ip *ip;
@@ -435,7 +435,7 @@ void send_igmp(int ifi, uint32_t src, uint32_t dst, int type, int code, uint32_t
 
     /* For all IGMP, change egress interface (we have only one socket) */
     if (IN_MULTICAST(ntohl(dst)))
-	k_set_if(ifi);
+	k_set_if(ifindex);
 
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;

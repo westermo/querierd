@@ -9,104 +9,104 @@
 /*
  * Exported variables.
  */
-TAILQ_HEAD(ifaces, iface) ifaces = TAILQ_HEAD_INITIALIZER(ifaces);
+TAILQ_HEAD(ifaces, ifi) ifaces = TAILQ_HEAD_INITIALIZER(ifaces);
 
 void config_set_ifflag(uint32_t flag)
 {
-    struct iface *uv;
+    struct ifi *ifi;
 
-    TAILQ_FOREACH(uv, &ifaces, uv_link)
-	uv->uv_flags |= flag;
+    TAILQ_FOREACH(ifi, &ifaces, ifi_link)
+	ifi->ifi_flags |= flag;
 }
 
-struct iface *config_iface_iter(int first)
+struct ifi *config_iface_iter(int first)
 {
-    static struct iface *next = NULL;
-    struct iface *uv;
+    static struct ifi *next = NULL;
+    struct ifi *ifi;
 
     if (first)
-	uv = TAILQ_FIRST(&ifaces);
+	ifi = TAILQ_FIRST(&ifaces);
     else
-	uv = next;
+	ifi = next;
 
-    if (uv)
-	next = TAILQ_NEXT(uv, uv_link);
+    if (ifi)
+	next = TAILQ_NEXT(ifi, ifi_link);
 
-    return uv;
+    return ifi;
 }
 
-struct iface *config_find_ifname(char *nm)
+struct ifi *config_find_ifname(char *nm)
 {
-    struct iface *uv;
+    struct ifi *ifi;
 
     if (!nm) {
 	errno = EINVAL;
 	return NULL;
     }
 
-    TAILQ_FOREACH(uv, &ifaces, uv_link) {
-        if (!strcmp(uv->uv_name, nm))
-            return uv;
+    TAILQ_FOREACH(ifi, &ifaces, ifi_link) {
+        if (!strcmp(ifi->ifi_name, nm))
+            return ifi;
     }
 
     return NULL;
 }
 
-struct iface *config_find_ifaddr(in_addr_t addr)
+struct ifi *config_find_ifaddr(in_addr_t addr)
 {
-    struct iface *uv;
+    struct ifi *ifi;
 
-    TAILQ_FOREACH(uv, &ifaces, uv_link) {
-	if (addr == uv->uv_curr_addr)
-            return uv;
+    TAILQ_FOREACH(ifi, &ifaces, ifi_link) {
+	if (addr == ifi->ifi_curr_addr)
+            return ifi;
     }
 
     return NULL;
 }
 
-struct iface *config_find_iface(int ifi)
+struct ifi *config_find_iface(int ifindex)
 {
-    struct iface *uv;
+    struct ifi *ifi;
 
-    TAILQ_FOREACH(uv, &ifaces, uv_link) {
-	if (ifi == uv->uv_ifindex)
-            return uv;
+    TAILQ_FOREACH(ifi, &ifaces, ifi_link) {
+	if (ifindex == ifi->ifi_ifindex)
+            return ifi;
     }
 
     return NULL;
 }
 
-struct iface *config_iface_add(char *ifname)
+struct ifi *config_iface_add(char *ifname)
 {
-    struct iface *uv;
-    int ifi;
+    struct ifi *ifi;
+    int ifindex;
 
-    ifi = if_nametoindex(ifname);
-    if (!ifi) {
+    ifindex = if_nametoindex(ifname);
+    if (!ifindex) {
 	logit(LOG_WARNING, errno, "Failed reading ifindex for %s, skipping", ifname);
 	return NULL;
     }
 
-    uv = calloc(1, sizeof(struct iface));
-    if (!uv) {
+    ifi = calloc(1, sizeof(struct ifi));
+    if (!ifi) {
 	logit(LOG_ERR, errno, "failed allocating memory for iflist");
 	return NULL;
     }
 
-    iface_zero(uv);
-    uv->uv_ifindex = ifi;
-    strlcpy(uv->uv_name, ifname, sizeof(uv->uv_name));
+    iface_zero(ifi);
+    ifi->ifi_ifindex = ifindex;
+    strlcpy(ifi->ifi_name, ifname, sizeof(ifi->ifi_name));
 
-    TAILQ_INSERT_TAIL(&ifaces, uv, uv_link);
+    TAILQ_INSERT_TAIL(&ifaces, ifi, ifi_link);
 
-    return uv;
+    return ifi;
 }
 
-static struct iface *addr_add(int ifi, struct sockaddr *sa, unsigned int flags)
+static struct ifi *addr_add(int ifindex, struct sockaddr *sa, unsigned int flags)
 {
     struct sockaddr_in *sin = (struct sockaddr_in *)sa;
     struct phaddr *pa;
-    struct iface *uv;
+    struct ifi *ifi;
 
     /*
      * Ignore any interface for an address family other than IP
@@ -121,39 +121,39 @@ static struct iface *addr_add(int ifi, struct sockaddr *sa, unsigned int flags)
     if ((flags & (IFF_LOOPBACK|IFF_MULTICAST)) != IFF_MULTICAST)
 	return NULL;
 
-    uv = config_find_iface(ifi);
-    if (!uv)
+    ifi = config_find_iface(ifindex);
+    if (!ifi)
 	return NULL;
 
     /* kernel promotes secondary addresses, we know all addrs already */
-    TAILQ_FOREACH(pa, &uv->uv_addrs, pa_link) {
+    TAILQ_FOREACH(pa, &ifi->ifi_addrs, pa_link) {
 	if (pa->pa_addr == sin->sin_addr.s_addr)
 	    return NULL;	/* Already have it */
     }
 
     pa = calloc(1, sizeof(*pa));
     if (!pa) {
-	logit(LOG_ERR, errno, "Failed allocating address for %s", uv->uv_name);
+	logit(LOG_ERR, errno, "Failed allocating address for %s", ifi->ifi_name);
 	return NULL;
     }
 
     pa->pa_addr  = sin->sin_addr.s_addr;
-    TAILQ_INSERT_TAIL(&uv->uv_addrs, pa, pa_link);
+    TAILQ_INSERT_TAIL(&ifi->ifi_addrs, pa, pa_link);
 
     if (!(flags & IFF_UP))
-	uv->uv_flags |= VIFF_DOWN;
+	ifi->ifi_flags |= VIFF_DOWN;
 
     logit(LOG_DEBUG, 0, "New address %s for %s flags %p",
-	  inet_fmt(pa->pa_addr, s1, sizeof(s1)), uv->uv_name, flags);
+	  inet_fmt(pa->pa_addr, s1, sizeof(s1)), ifi->ifi_name, flags);
 
-    return uv;
+    return ifi;
 }
 
-static struct iface *addr_del(int ifi, struct sockaddr *sa)
+static struct ifi *addr_del(int ifindex, struct sockaddr *sa)
 {
     struct sockaddr_in *sin = (struct sockaddr_in *)sa;
     struct phaddr *pa, *tmp;
-    struct iface *uv;
+    struct ifi *ifi;
 
     /*
      * Ignore any interface for an address family other than IP
@@ -161,59 +161,59 @@ static struct iface *addr_del(int ifi, struct sockaddr *sa)
     if (!sa || sa->sa_family != AF_INET)
 	return NULL;
 
-    uv = config_find_iface(ifi);
-    if (!uv)
+    ifi = config_find_iface(ifindex);
+    if (!ifi)
 	return NULL;
 
-    TAILQ_FOREACH_SAFE(pa, &uv->uv_addrs, pa_link, tmp) {
+    TAILQ_FOREACH_SAFE(pa, &ifi->ifi_addrs, pa_link, tmp) {
 	if (pa->pa_addr != sin->sin_addr.s_addr)
 	    continue;
 
-	TAILQ_REMOVE(&uv->uv_addrs, pa, pa_link);
+	TAILQ_REMOVE(&ifi->ifi_addrs, pa, pa_link);
 	logit(LOG_DEBUG, 0, "Drop address %s for %s", inet_fmt(pa->pa_addr, s1, sizeof(s1)),
-	      uv->uv_name);
+	      ifi->ifi_name);
 	free(pa);
-	return uv;
+	return ifi;
     }
 
     return NULL;
 }
 
-void config_iface_addr_add(int ifi, struct sockaddr *sa, unsigned int flags)
+void config_iface_addr_add(int ifindex, struct sockaddr *sa, unsigned int flags)
 {
-    struct iface *uv;
+    struct ifi *ifi;
 
-    uv = addr_add(ifi, sa, flags);
-    if (uv) {
-	if (uv->uv_flags & VIFF_DISABLED) {
-	    logit(LOG_DEBUG, 0, "    %s disabled, no election", uv->uv_name);
+    ifi = addr_add(ifindex, sa, flags);
+    if (ifi) {
+	if (ifi->ifi_flags & VIFF_DISABLED) {
+	    logit(LOG_DEBUG, 0, "    %s disabled, no election", ifi->ifi_name);
 	    return;
 	}
-	if (uv->uv_flags & VIFF_DOWN) {
-	    logit(LOG_DEBUG, 0, "    %s down, no election", uv->uv_name);
+	if (ifi->ifi_flags & VIFF_DOWN) {
+	    logit(LOG_DEBUG, 0, "    %s down, no election", ifi->ifi_name);
 	    return;
 	}
 
-	iface_check_election(uv);
+	iface_check_election(ifi);
     }
 }
 
-void config_iface_addr_del(int ifi, struct sockaddr *sa)
+void config_iface_addr_del(int ifindex, struct sockaddr *sa)
 {
-    struct iface *uv;
+    struct ifi *ifi;
 
-    uv = addr_del(ifi, sa);
-    if (uv) {
-	if (uv->uv_flags & VIFF_DISABLED) {
-	    logit(LOG_DEBUG, 0, "    %s disabled, no election", uv->uv_name);
+    ifi = addr_del(ifindex, sa);
+    if (ifi) {
+	if (ifi->ifi_flags & VIFF_DISABLED) {
+	    logit(LOG_DEBUG, 0, "    %s disabled, no election", ifi->ifi_name);
 	    return;
 	}
-	if (uv->uv_flags & VIFF_DOWN) {
-	    logit(LOG_DEBUG, 0, "    %s down, no election", uv->uv_name);
+	if (ifi->ifi_flags & VIFF_DOWN) {
+	    logit(LOG_DEBUG, 0, "    %s down, no election", ifi->ifi_name);
 	    return;
 	}
 
-	iface_check_election(uv);
+	iface_check_election(ifi);
     }
 }
 
@@ -228,13 +228,13 @@ void config_iface_from_kernel(void)
 	logit(LOG_ERR, errno, "getifaddrs");
 
     for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-	int ifi;
+	int ifindex;
 
-	ifi = if_nametoindex(ifa->ifa_name);
-	if (!ifi)
+	ifindex = if_nametoindex(ifa->ifa_name);
+	if (!ifindex)
 	    continue;
 
-	addr_add(ifi, ifa->ifa_addr, ifa->ifa_flags);
+	addr_add(ifindex, ifa->ifa_addr, ifa->ifa_flags);
     }
 
     freeifaddrs(ifap);
