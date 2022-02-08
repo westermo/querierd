@@ -10,6 +10,8 @@ Planned for v0.4
  - querierctl tool to display status and show igmp queriers
  - Look into timeout value for queriers in status output
  - Fix "show" IPC command, should be "show igmp"
+ - Add "show mdb [vid NUM]" command to dump bridge's mdb in WeOS alt view
+ - Write mini-HowTo: Setting up the Linux bridge with snooping per VLAN
 
 
 Planned for v1.0
