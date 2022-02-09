@@ -4,6 +4,7 @@ Rough Plan for querierd
 Planned for v0.4
 ----------------
 
+ - Handle RELOAD events where interfaces are removed from .conf -> new IFIF_PRUNE flag?
  - querierctl tool to display status and show igmp queriers
  - Look into timeout value for queriers in status output
  - Fix "show" IPC command, should be "show igmp"
