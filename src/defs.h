@@ -153,6 +153,8 @@ extern int		igmp_debug_kind(uint32_t, uint32_t);
 /* iface.c */
 extern void		iface_init(void);
 extern void		iface_zero(struct ifi *);
+extern void             iface_add(int, int);
+extern void             iface_del(int, int);
 extern void             iface_check_election(struct ifi *);
 extern void             iface_check(int, unsigned int);
 extern void		iface_check_state(void);

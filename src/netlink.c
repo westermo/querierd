@@ -26,7 +26,6 @@ static void netlink_read(int sd, void *arg)
 
                 while (rtl && RTA_OK(rth, rtl)) {
                     if (rth->rta_type == IFA_LOCAL) {
-#if 1
 			struct in_addr *ina = (struct in_addr *)RTA_DATA(rth);
 			struct sockaddr_in sin = { 0 };
 			int flags;
@@ -39,34 +38,25 @@ static void netlink_read(int sd, void *arg)
 			    config_iface_addr_add(ifa->ifa_index, (struct sockaddr *)&sin, flags);
 			else
 			    config_iface_addr_del(ifa->ifa_index, (struct sockaddr *)&sin);
-#else // debug
-                        char name[IFNAMSIZ];
-                        char addr[INET_ADDRSTRLEN];
-
-			if_indextoname(ifa->ifa_index, name);
-			inet_ntop(ifa->ifa_family, RTA_DATA(rth), addr, sizeof(addr));
-			if (nlh->nlmsg_type == RTM_NEWADDR)
-			    logit(LOG_DEBUG, 0, "ADD address for %s addr: %s", name, addr);
-			else
-			    logit(LOG_DEBUG, 0, "DEL address for %s addr: %s", name, addr);
-#endif
                     }
 
                     rth = RTA_NEXT(rth, rtl);
                 }
             }
+
             if (nlh->nlmsg_type == RTM_NEWLINK || nlh->nlmsg_type == RTM_DELLINK) {
                 struct ifinfomsg *ifi = (struct ifinfomsg *)NLMSG_DATA(nlh);
-#if 1
-		iface_check(ifi->ifi_index, ifi->ifi_flags);
-#else // debug
-		if (nlh->nlmsg_type == RTM_NEWLINK)
-		    logit(LOG_DEBUG, 0, "Link UP %d flags %p", ifi->ifi_index, ifi->ifi_flags);
-		else
-		    logit(LOG_DEBUG, 0, "Link DN %d flags %p", ifi->ifi_index, ifi->ifi_flags);
-#endif
+
+		if (nlh->nlmsg_type == RTM_NEWLINK) {
+		    if (!config_find_iface(ifi->ifi_index))
+			iface_add(ifi->ifi_index, ifi->ifi_flags);
+		    else
+			iface_check(ifi->ifi_index, ifi->ifi_flags);
+		} else
+		    iface_del(ifi->ifi_index, ifi->ifi_flags);
 	    }
-            nlh = NLMSG_NEXT(nlh, len);
+
+	    nlh = NLMSG_NEXT(nlh, len);
         }
     }
 }

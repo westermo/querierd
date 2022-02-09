@@ -66,23 +66,7 @@ void iface_exit(void)
     struct ifi *ifi;
 
     for (ifi = config_iface_iter(1); ifi; ifi = config_iface_iter(0)) {
-	stop_iface(ifi);
-
-	if (ifi->ifi_querier) {
-	    free(ifi->ifi_querier);
-	    ifi->ifi_querier = NULL;
-	}
-
-	TAILQ_FOREACH_SAFE(a, &ifi->ifi_groups, al_link, tmp) {
-	    TAILQ_REMOVE(&ifi->ifi_groups, a, al_link);
-	    free(a);
-	}
-
-	TAILQ_FOREACH_SAFE(pa, &ifi->ifi_addrs, pa_link, pat) {
-	    TAILQ_REMOVE(&ifi->ifi_addrs, pa, pa_link);
-	    free(pa);
-	}
-
+	iface_del(ifi->ifi_ifindex, 0);
 	free(ifi);
     }
 }
@@ -165,26 +149,83 @@ void iface_check_election(struct ifi *ifi)
     send_query(ifi, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
 }
 
+/*
+ * Called by netlink backend
+ */
+void iface_add(int ifindex, int flags)
+{
+    char ifname[IFNAMSIZ];
+    struct ifi *ifi;
+
+    if (!if_indextoname(ifindex, ifname))
+	return; /* should not happen, but lost (again?) */
+
+    /* Check if this is something we're interested in */
+    ifi = config_find_ifname(ifname);
+    if (!ifi)
+	return;
+
+    logit(LOG_DEBUG, 0, "Marking %s as now available in system", ifi->ifi_name);
+    ifi->ifi_ifindex = ifindex;
+
+    iface_check(ifindex, flags);
+}
+
+/*
+ * Called by netlink backend
+ */
+void iface_del(int ifindex, int flags)
+{
+    struct listaddr *al, *tmp;
+    struct phaddr *pa, *pat;
+    struct ifi *ifi;
+
+    ifi = config_find_iface(ifindex);
+    if (!ifi)
+	return;	/* unused in .conf */
+
+    logit(LOG_DEBUG, 0, "Marking %s as removed from system", ifi->ifi_name);
+    stop_iface(ifi);
+
+    if (ifi->ifi_querier) {
+	free(ifi->ifi_querier);
+	ifi->ifi_querier = NULL;
+    }
+
+    TAILQ_FOREACH_SAFE(al, &ifi->ifi_groups, al_link, tmp) {
+	TAILQ_REMOVE(&ifi->ifi_groups, al, al_link);
+	free(al);
+    }
+
+    TAILQ_FOREACH_SAFE(pa, &ifi->ifi_addrs, pa_link, pat) {
+	TAILQ_REMOVE(&ifi->ifi_addrs, pa, pa_link);
+	free(pa);
+    }
+
+    ifi->ifi_prev_addr = 0;
+    ifi->ifi_curr_addr = 0;
+    ifi->ifi_ifindex = 0;
+    ifi->ifi_flags |= IFIF_DOWN;
+}
+
 void iface_check(int ifindex, unsigned int flags)
 {
     struct ifi *ifi;
 
     ifi = config_find_iface(ifindex);
     if (!ifi) {
-	logit(LOG_DEBUG, 0, "Cannot find ifindex %d in configuration, skipping ...", ifindex);
+	logit(LOG_DEBUG, 0, "Cannot find an active ifindex %d in configuration, skipping ...", ifindex);
 	return;
     }
 
     logit(LOG_DEBUG, 0, "Check %s known flags %p new flags %p", ifi->ifi_name, ifi->ifi_flags, flags);
     if (ifi->ifi_flags & IFIF_DOWN) {
 	if (flags & IFF_UP) {
-	    logit(LOG_INFO, 0, "%s has come up; interface now in service", ifi->ifi_name);
 	    ifi->ifi_flags &= ~IFIF_DOWN;
 	    start_iface(ifi);
 	}
     } else {
 	if (!(flags & IFF_UP)) {
-	    logit(LOG_INFO, 0, "%s has gone down; interface out of service", ifi->ifi_name);
 	    stop_iface(ifi);
 	    ifi->ifi_flags |= IFIF_DOWN;
 	}
@@ -213,8 +254,13 @@ void iface_check_state(void)
 
 	memset(&ifr, 0, sizeof(ifr));
 	memcpy(ifr.ifr_name, ifi->ifi_name, sizeof(ifr.ifr_name));
-	if (ioctl(igmp_socket, SIOCGIFFLAGS, &ifr) < 0)
-	    logit(LOG_ERR, errno, "Failed ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
+	if (ioctl(igmp_socket, SIOCGIFFLAGS, &ifr) < 0) {
+	    if (errno == ENODEV) {
+		ifi->ifi_flags  |= IFIF_DISABLED;
+		continue;
+	    }
+	    logit(LOG_WARNING, errno, "Failed ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
+	}
 
 	iface_check(ifi->ifi_ifindex, ifr.ifr_flags);
     }
@@ -265,9 +311,6 @@ static void send_query(struct ifi *ifi, uint32_t dst, int code, uint32_t group)
 
 static void start_iface(struct ifi *ifi)
 {
-    struct listaddr *a;
-    struct phaddr *p;
-
     /*
      * Join the ALL-ROUTERS multicast group on the interface.
      * This allows mtrace requests to loop back if they are run
@@ -289,6 +332,8 @@ static void start_iface(struct ifi *ifi)
      * Check if we should assume the querier role
      */
     iface_check_election(ifi);
+
+    logit(LOG_INFO, 0, "Interface %s now in service", ifi->ifi_name);
 }
 
 static void stop_iface(struct ifi *ifi)
@@ -322,6 +367,8 @@ static void stop_iface(struct ifi *ifi)
 
     logit(LOG_DEBUG, 0, "Releasing querier duties on interface %s", ifi->ifi_name);
     ifi->ifi_flags &= ~IFIF_QUERIER;
+
+    logit(LOG_INFO, 0, "Interface %s out of service", ifi->ifi_name);
 }
 
 /*

@@ -76,16 +76,17 @@ struct ifi *config_find_iface(int ifindex)
     return NULL;
 }
 
+/*
+ * Called by parser to add an interface to start or watch for in the future
+ */
 struct ifi *config_iface_add(char *ifname)
 {
     struct ifi *ifi;
     int ifindex;
 
-    ifindex = if_nametoindex(ifname);
-    if (!ifindex) {
-	logit(LOG_WARNING, errno, "Failed reading ifindex for %s, skipping", ifname);
-	return NULL;
-    }
+    ifi = config_find_ifname(ifname);
+    if (ifi)
+	return ifi;
 
     ifi = calloc(1, sizeof(struct ifi));
     if (!ifi) {
@@ -94,8 +95,16 @@ struct ifi *config_iface_add(char *ifname)
     }
 
     iface_zero(ifi);
-    ifi->ifi_ifindex = ifindex;
     strlcpy(ifi->ifi_name, ifname, sizeof(ifi->ifi_name));
+
+    /*
+     * May not exist yet, prepare for netlink event later
+     */
+    ifindex = if_nametoindex(ifname);
+    if (ifindex)
+	ifi->ifi_ifindex = ifindex;
+    else
+	ifi->ifi_flags |= IFIF_DOWN;
 
     TAILQ_INSERT_TAIL(&ifaces, ifi, ifi_link);
 
