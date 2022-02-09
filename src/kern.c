@@ -141,9 +141,11 @@ void k_leave(uint32_t grp, int ifindex)
     mreq.imr_multiaddr.s_addr = grp;
     mreq.imr_ifindex = ifindex;
 
-    if (setsockopt(igmp_socket, IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
-	logit(LOG_WARNING, errno, "Cannot leave group %s on ifindex %d",
-	      inet_fmt(grp, s1, sizeof(s1)), ifindex);
+    if (setsockopt(igmp_socket, IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+	if (errno != EADDRNOTAVAIL)
+	    logit(LOG_WARNING, errno, "Cannot leave group %s on ifindex %d",
+		  inet_fmt(grp, s1, sizeof(s1)), ifindex);
+    }
 }
 
 /**
