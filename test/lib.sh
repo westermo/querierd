@@ -1,5 +1,5 @@
 #!/bin/sh
-# Helper functions for testing SMCRoute
+# Helper functions for testing querierd
 
 # Test name, used everywhere as /tmp/$NM/foo
 NM=$(basename "$0" .sh)
@@ -36,6 +36,22 @@ OK()
     exit 0
 }
 
+addif()
+{
+    ip link add "$1" type dummy
+    ip link set "$1" up
+    ip link set "$1" multicast on
+
+    if [ -n "$2" ]; then
+	ip addr add "$2" dev "$1"
+    fi
+}
+
+delif()
+{
+    ip link del "$1"
+}
+
 # shellcheck disable=SC2068
 check_dep()
 {
@@ -60,15 +76,6 @@ tenacious()
     done
 
     FAIL "Timeed out $*"
-}
-
-show_mroute()
-{
-    # Show active routes (and counters)
-    cat /proc/net/ip_mr_cache
-    echo "-----------------------------------------------------------------------------------"
-    ip mroute
-    echo "-----------------------------------------------------------------------------------"
 }
 
 emitter()
