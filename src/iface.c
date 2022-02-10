@@ -218,7 +218,7 @@ void iface_check(int ifindex, unsigned int flags)
 	return;
     }
 
-    logit(LOG_DEBUG, 0, "Check %s known flags %p new flags %p", ifi->ifi_name, ifi->ifi_flags, flags);
+    logit(LOG_DEBUG, 0, "Check %s flags 0x%x new flags 0x%x", ifi->ifi_name, ifi->ifi_flags, flags);
     if (ifi->ifi_flags & IFIF_DOWN) {
 	if (flags & IFF_UP) {
 	    ifi->ifi_flags &= ~IFIF_DOWN;

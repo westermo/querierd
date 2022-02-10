@@ -152,7 +152,7 @@ static struct ifi *addr_add(int ifindex, struct sockaddr *sa, unsigned int flags
     if (!(flags & IFF_UP))
 	ifi->ifi_flags |= IFIF_DOWN;
 
-    logit(LOG_DEBUG, 0, "New address %s for %s flags %p",
+    logit(LOG_DEBUG, 0, "New address %s for %s flags 0x%x",
 	  inet_fmt(pa->pa_addr, s1, sizeof(s1)), ifi->ifi_name, flags);
 
     return ifi;
