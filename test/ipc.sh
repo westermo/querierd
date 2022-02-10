@@ -41,8 +41,8 @@ print "IPC output ..."
 echo "help"    |socat - UNIX-CONNECT:"/tmp/$NM/sock"
 echo "version" |socat - UNIX-CONNECT:"/tmp/$NM/sock"
 echo
-echo "status"  |socat - UNIX-CONNECT:"/tmp/$NM/sock"
-echo "show"    |socat - UNIX-CONNECT:"/tmp/$NM/sock" | tee "/tmp/$NM/show"
+echo "status status" |socat - UNIX-CONNECT:"/tmp/$NM/sock"
+echo "show igmp"     |socat - UNIX-CONNECT:"/tmp/$NM/sock" | tee "/tmp/$NM/show"
 
 print "Analyzing ..."
 kill_pids

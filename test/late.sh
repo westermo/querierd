@@ -29,16 +29,17 @@ echo $! >> "/tmp/$NM/PIDs"
 sleep 2
 
 print "Analyzing ..."
-echo "show"    |socat - UNIX-CONNECT:"/tmp/$NM/sock" | tee "/tmp/$NM/show"
+echo "show igmp" |socat - UNIX-CONNECT:"/tmp/$NM/sock" | tee "/tmp/$NM/show"
 
 grep "eth0" "/tmp/$NM/show" | grep -q "192.168.0.1" || FAIL
 
 addif eth1 192.168.1.1/24
-echo "show"    |socat - UNIX-CONNECT:"/tmp/$NM/sock" | tee "/tmp/$NM/show"
+echo "show igmp" |socat - UNIX-CONNECT:"/tmp/$NM/sock" | tee "/tmp/$NM/show"
 grep "eth0" "/tmp/$NM/show" | grep -q "192.168.0.1" || FAIL
+grep "eth1" "/tmp/$NM/show" | grep -q "192.168.1.1" || FAIL
 
 delif eth0
-echo "show"    |socat - UNIX-CONNECT:"/tmp/$NM/sock" | tee "/tmp/$NM/show"
+echo "show igmp" |socat - UNIX-CONNECT:"/tmp/$NM/sock" | tee "/tmp/$NM/show"
 grep "eth0" "/tmp/$NM/show" | grep -q "192.168.0.1" && FAIL
 
 OK
