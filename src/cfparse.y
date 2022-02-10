@@ -276,10 +276,14 @@ static int yylex(void)
 		return GROUP;
 	    }
         }
-    } else if (sscanf(q, "0x%8x%c", &n, s1) == 1) {
+    }
+
+    if (sscanf(q, "0x%8x%c", &n, s1) == 1) {
         yylval.addr = n;
         return ADDR;
-    } else if (sscanf(q, "%u%c", &n, s1) == 1) {
+    }
+
+    if (sscanf(q, "%u%c", &n, s1) == 1) {
         yylval.num = n;
         return NUMBER;
     }
