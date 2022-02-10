@@ -444,8 +444,10 @@ void accept_membership_query(int ifindex, uint32_t src, uint32_t dst, uint32_t g
 
 	    if (!ifi->ifi_querier) {
 		ifi->ifi_querier = calloc(1, sizeof(struct listaddr));
-		if (!ifi->ifi_querier)
+		if (!ifi->ifi_querier) {
 		    logit(LOG_ERR, errno, "%s(): Failed allocating memory", __func__);
+		    return;
+		}
 
 		ifi->ifi_querier->al_timerid = pev_timer_add(router_timeout * 1000000, 0, router_timeout_cb, ifi);
 		ifi->ifi_flags &= ~IFIF_QUERIER;
