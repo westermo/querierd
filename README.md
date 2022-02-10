@@ -1,6 +1,6 @@
 Bridge Querier Helper
 =====================
-[![License Badge][]][License] [![GitHub Status][]][GitHub]
+[![License Badge][]][License] [![GitHub Status][]][GitHub] [![Coverity Status][]][Coverity Scan]
 
 This daemon is a querier helper for the Linux bridge.  Currently only
 IGMP is supported, support for initiating MLD queries is planned.
@@ -115,11 +115,13 @@ ancestor (mrouted).
 The [project][1] is maintained by Westermo Network Technologies, and due to
 its origin, licensed under the same license as mrouted.
 
-[1]:             https://github.com/westermo/querierd/
-[GitHub]:        https://github.com/westermo/querierd/actions/workflows/build.yml/
-[GitHub Status]: https://github.com/westermo/querierd/actions/workflows/build.yml/badge.svg
-[License]:       http://www.openbsd.org/cgi-bin/cvsweb/src/usr.sbin/mrouted/LICENSE
-[License Badge]: https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
-[mrouted]:       https://github.com/troglobit/mrouted/
-[pimd]:          https://github.com/troglobit/pimd/
-[pim6sd]:        https://github.com/troglobit/pim6sd/
+[1]:               https://github.com/westermo/querierd/
+[GitHub]:          https://github.com/westermo/querierd/actions/workflows/build.yml/
+[GitHub Status]:   https://github.com/westermo/querierd/actions/workflows/build.yml/badge.svg
+[License]:         http://www.openbsd.org/cgi-bin/cvsweb/src/usr.sbin/mrouted/LICENSE
+[License Badge]:   https://img.shields.io/badge/License-BSD%203--Clause-blue.svg
+[Coverity Scan]:   https://scan.coverity.com/projects/24475
+[Coverity Status]: https://scan.coverity.com/projects/24475/badge.svg
+[mrouted]:         https://github.com/troglobit/mrouted/
+[pimd]:            https://github.com/troglobit/pimd/
+[pim6sd]:          https://github.com/troglobit/pim6sd/
