@@ -2,8 +2,8 @@ Bridge Querier Helper
 =====================
 [![License Badge][]][License] [![GitHub Status][]][GitHub] [![Coverity Status][]][Coverity Scan]
 
-This daemon is a querier helper for the Linux bridge.  Currently only
-IGMP is supported, support for initiating MLD queries is planned.
+This daemon is a querier helper for the Linux bridge.  Currently IGMP
+(IPv4) is supported, MLD (IPv6) querier support is planned.
 
 Basic IPC support available:
 
@@ -20,6 +20,7 @@ settings to enable and tweak the defaults.  There is no way to configure
 different IGMP/MLD settings per interface at the moment, only protocol
 version.
 
+    # /etc/querierd.conf syntax
     query-interval [1-1024]                   # default: 125 sec
     query-response-interval [1-1024]          # default: 10 sec
     query-last-member-interval [1-1024]       # default: 1
@@ -98,7 +99,7 @@ networks, in those days everyone could see a single IGMPv2 message and
 everyone could potentially confuse that end-device with a newer version.
 
 _____
-¹ E.g., Quagga/Frr PIM, or little mrouted/pimd/pimd-dense/pim6sd
+¹ E.g., Quagga/Frr PIM, or little mrouted/pimd/pimd-dense/pim6sd  
 ² remember, multicast acts like broadcast if it's not limited (by IGMP
   or MLD), so disabling IGMP/MLD snooping is not an option in these
   networks, they are what actually keep most of these sites afloat.
