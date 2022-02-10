@@ -1,5 +1,6 @@
 *.o
 .deps
 .dirstamp
-querierd
 cfparse.c
+querierd
+querierctl
