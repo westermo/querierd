@@ -221,6 +221,10 @@ extern size_t		strlcat(char *dst, const char *src, size_t siz);
 extern long long	strtonum(const char *numstr, long long minval, long long maxval, const char **errstrp);
 #endif
 
+#ifndef HAVE_TEMPFILE
+extern FILE *		tempfile(void);
+#endif
+
 #ifndef HAVE_PIDFILE
 extern int		pidfile(const char *basename);
 #endif
