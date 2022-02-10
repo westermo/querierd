@@ -251,22 +251,22 @@ static int yylex(void)
             return w->val2 ? w->val2 : w->val1;
     }
 
-    if (!strcmp(q,"on") || !strcmp(q,"yes")) {
+    if (!strcmp(q, "on") || !strcmp(q, "yes")) {
         yylval.num = 1;
         return BOOLEAN;
     }
 
-    if (!strcmp(q,"off") || !strcmp(q,"no")) {
+    if (!strcmp(q, "off") || !strcmp(q, "no")) {
         yylval.num = 0;
         return BOOLEAN;
     }
 
-    if (sscanf(q,"%[.0-9]/%u%c",s1,&n,s2) == 2) {
-	addr = inet_parse(s1,1);
+    if (sscanf(q, "%[.0-9]/%u%c", s1, &n, s2) == 2) {
+	addr = inet_parse(s1, 1);
         /* fall through to returning STRING */
     }
 
-    if (sscanf(q,"%[.0-9]%c",s1,s2) == 1) {
+    if (sscanf(q, "%[.0-9]%c", s1, s2) == 1) {
 	addr = inet_parse(s1, 4);
         if (addr != 0xffffffff) {
 	    if (inet_valid_host(addr)) {
@@ -280,12 +280,12 @@ static int yylex(void)
         }
     }
 
-    if (sscanf(q,"0x%8x%c", &n, s1) == 1) {
+    if (sscanf(q, "0x%8x%c", &n, s1) == 1) {
         yylval.addr = n;
         return ADDR;
     }
 
-    if (sscanf(q,"%u%c",&n,s1) == 1) {
+    if (sscanf(q, "%u%c", &n, s1) == 1) {
         yylval.num = n;
         return NUMBER;
     }
