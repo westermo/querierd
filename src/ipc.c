@@ -76,8 +76,9 @@ struct ipcmd {
 	{ IPC_VERSION,    "version", NULL, "Show daemon version" },
 //	{ IPC_IGMP_GRP,   "groups", NULL, "Show IGMP group memberships" },
 //	{ IPC_IGMP_IFACE, "interfaces", NULL, "Show IGMP interface status" },
-	{ IPC_STATUS,     "status", NULL, "Show daemon status" },
-	{ IPC_IGMP,       "show", NULL, NULL }, /* hidden default */
+	{ IPC_STATUS,     "show status", NULL, "Show daemon status (default)" },
+	{ IPC_IGMP,       "show igmp", NULL, "Show interfaces and group memberships" },
+	{ IPC_STATUS,     "show", NULL, NULL }, /* hidden default */
 };
 
 static char *timetostr(time_t t, char *buf, size_t len)
