@@ -53,7 +53,7 @@
 static struct sockaddr_un sun;
 static int ipc_sockid =  0;
 static int ipc_socket = -1;
-static int detail = 0;
+int detail = 0;
 
 enum {
 	IPC_ERR = -1,
@@ -63,6 +63,7 @@ enum {
 	IPC_IGMP,
 	IPC_IGMP_GRP,
 	IPC_IGMP_IFACE,
+	IPC_COMPAT,
 	IPC_STATUS
 };
 
@@ -74,12 +75,19 @@ struct ipcmd {
 } cmds[] = {
 	{ IPC_HELP,       "help", NULL, "This help text" },
 	{ IPC_VERSION,    "version", NULL, "Show daemon version" },
-//	{ IPC_IGMP_GRP,   "groups", NULL, "Show IGMP group memberships" },
-//	{ IPC_IGMP_IFACE, "interfaces", NULL, "Show IGMP interface status" },
+	{ IPC_IGMP_GRP,   "show groups", NULL, "Show IGMP/MLD group memberships" },
+	{ IPC_IGMP_IFACE, "show interfaces", NULL, "Show IGMP/MLD interface status" },
 	{ IPC_STATUS,     "show status", NULL, "Show daemon status (default)" },
 	{ IPC_IGMP,       "show igmp", NULL, "Show interfaces and group memberships" },
-	{ IPC_STATUS,     "show", NULL, NULL }, /* hidden default */
+	{ IPC_COMPAT,     "show compat", "[detail]", "Show legacy output (test compat mode)" },
+	{ IPC_IGMP,       "show", NULL, NULL }, /* hidden default */
 };
+
+extern void bridge_prop(FILE *fp, char *prop, int setval);
+extern void bridge_router_ports(FILE *fp);
+extern int show_bridge_compat(FILE *fp);
+extern int show_bridge_groups(FILE *fp);
+
 
 static char *timetostr(time_t t, char *buf, size_t len)
 {
@@ -286,63 +294,42 @@ static const char *ifstate(struct ifi *ifi)
 	return "Up";
 }
 
-#if 0
-static int show_igmp_groups(FILE *fp)
+static int show_status(FILE *fp)
 {
-	struct listaddr *group, *source;
-	struct ifi *ifi;
-
-	fprintf(fp, "IGMP Group Membership Table_\n");
-	fprintf(fp, "Interface         Group            Source           Last Reported    Timeout=\n");
-	for (ifi = config_iface_iter(1); ifi; ifi = config_iface_iter(0)) {
-		for (group = ifi->ifi_groups; group; group = group->al_next) {
-			char pre[40], post[40];
-
-			snprintf(pre, sizeof(pre), "%-16s  %-15s  ",
-				 ifi->ifi_name, inet_fmt(group->al_addr, s1, sizeof(s1)));
-
-			snprintf(post, sizeof(post), "%-15s  %7u",
-				 inet_fmt(group->al_reporter, s1, sizeof(s1)),
-				 group->al_timer);
-
-			if (!group->al_sources) {
-				fprintf(fp, "%s%-15s  %s\n", pre, "ANY", post);
-				continue;
-			}
-
-			for (source = group->al_sources; source; source = source->al_next)
-				fprintf(fp, "%s%-15s  %s\n",
-					pre, inet_fmt(source->al_addr, s1, sizeof(s1)), post);
-		}
+	if (detail)
+		fprintf(fp, "Process ID              : %d\n", getpid());
+	fprintf(fp, "Query Interval          : %d sec\n", igmp_query_interval);
+	if (detail) {
+		fprintf(fp, "Query Response Interval : %d sec\n", igmp_response_interval);
+		fprintf(fp, "Last Member Interval    : %d\n", igmp_last_member_interval);
 	}
+	fprintf(fp, "Robustness Value        : %d\n", igmp_robustness);
+	fprintf(fp, "Router Timeout          : %d\n", router_timeout);
+	if (detail)
+		fprintf(fp, "Router Alert            : %s\n", ENABLED(router_alert));
 
 	return 0;
 }
 
 static int show_igmp_iface(FILE *fp)
 {
-	struct listaddr *group;
 	struct ifi *ifi;
 
-	fprintf(fp, "IGMP Interface Table_\n");
-	fprintf(fp, "Interface         State     Querier          Timeout Version  Groups=\n");
-
-	struct ifi *ifi;
+	fprintf(fp, "Interface         State     Querier               Timeout  Ver=\n");
 	for (ifi = config_iface_iter(1); ifi; ifi = config_iface_iter(0)) {
-		size_t num = 0;
 		char timeout[10];
 		int version;
 
 		if (!ifi->ifi_querier) {
-			strlcpy(s1, "Local", sizeof(s1));
-			snprintf(timeout, sizeof(timeout), "None");
+			inet_fmt(ifi->ifi_curr_addr, s1, sizeof(s1));
+			snprintf(timeout, sizeof(timeout), "None   ");
 		} else {
-			inet_fmt(ifi->ifi_querier->al_addr, s1, sizeof(s1));
-			snprintf(timeout, sizeof(timeout), "%u", igmp_querier_timeout - ifi->ifi_querier->al_timer);
-		}
+			time_t t;
 
-		for (group = ifi->ifi_groups; group; group = group->al_next)
-			num++;
+			inet_fmt(ifi->ifi_querier->al_addr, s1, sizeof(s1));
+			t = time(NULL) - ifi->ifi_querier->al_ctime;
+			snprintf(timeout, sizeof(timeout), "%u", router_timeout - (int)t);
+		}
 
 		if (ifi->ifi_flags & IFIF_IGMPV1)
 			version = 1;
@@ -351,8 +338,8 @@ static int show_igmp_iface(FILE *fp)
 		else
 			version = 3;
 
-		fprintf(fp, "%-16s  %-8s  %-15s  %7s %7d  %6zd\n", ifi->ifi_name,
-			ifstate(ifi), s1, timeout, version, num);
+		fprintf(fp, "%-16s  %-8s  %-20s  %7s  %3d\n", ifi->ifi_name,
+			ifstate(ifi), s1, timeout, version);
 	}
 
 	return 0;
@@ -362,56 +349,49 @@ static int show_igmp(FILE *fp)
 {
 	int rc = 0;
 
+	fprintf(fp, "Multicast Overview=\n");
+	show_status(fp);
+	fprintf(fp, "%-23s : ", "Fast Leave Ports"); bridge_prop(fp, "multicast_fast_leave", 1);
+	fprintf(fp, "%-23s : ", "Router Ports");     bridge_router_ports(fp);
+	fprintf(fp, "%-23s : ", "Flood Ports");      bridge_prop(fp, "multicast_flood", 1);
+	fprintf(fp, "\n");
+
 	rc += show_igmp_iface(fp);
-	rc += show_igmp_groups(fp);
+	fprintf(fp, "\n");
+	rc += show_bridge_groups(fp);
 
 	return rc;
 }
-#endif
 
-static int show_igmp(FILE *fp)
+/*
+ * Silly wrapper around `bridge mdb show` to list group memberships in a
+ * slightly different manner -- closer to "show fdb" in WeOS
+ */
+static int show_mdb(FILE *fp)
 {
-	struct ifi *ifi;
+	const int devw = 6;	/* XXX: calculate width dynamically */
+	char buf[256];
+	FILE *pp;
 
-	fprintf(fp, "Interface         State     Querier          Timeout Version=\n");
-	for (ifi = config_iface_iter(1); ifi; ifi = config_iface_iter(0)) {
-		char timeout[10];
-		int version;
-
-		if (!ifi->ifi_querier) {
-			inet_fmt(ifi->ifi_curr_addr, s1, sizeof(s1));
-			snprintf(timeout, sizeof(timeout), "None");
-		} else {
-			inet_fmt(ifi->ifi_querier->al_addr, s1, sizeof(s1));
-			snprintf(timeout, sizeof(timeout), "%u", router_timeout -
-				 pev_timer_get(ifi->ifi_querier->al_timerid));
-		}
-
-		if (ifi->ifi_flags & IFIF_IGMPV1)
-			version = 1;
-		else if (ifi->ifi_flags & IFIF_IGMPV2)
-			version = 2;
-		else
-			version = 3;
-
-		fprintf(fp, "%-16s  %-8s  %-15s  %7s %7d\n", ifi->ifi_name,
-			ifstate(ifi), s1, timeout, version);
+	pp = popen("bridge mdb show", "r");
+	if (!pp) {
+		fprintf(fp, "Failed querying bridge for MDB entries: %s\n", strerror(errno));
+		return 1;
 	}
 
-	return 0;
-}
+	fprintf(fp, "%-28s %4s %-*s %s=\n", "Group", "VLAN", devw, "Bridge", "Port(s)");
+	while (fgets(buf, sizeof(buf), pp)) {
+		char flags[16];
+		char port[16];
+		char dev[16];
+		char grp[64];
+		int vid;
 
-static int show_status(FILE *fp)
-{
-	fprintf(fp, "Process ID                         : %d\n", getpid());
-	fprintf(fp, "Query interval, sec (QI)           : %d\n", igmp_query_interval);
-	fprintf(fp, "Query response interval, sec (QRI) : %d\n", igmp_response_interval);
-	fprintf(fp, "Last member interval               : %d\n", igmp_last_member_interval);
-	fprintf(fp, "Robustness (QRV)                   : %d\n", igmp_robustness);
-	fprintf(fp, "Router timeout                     : %d\n", router_timeout);
-	fprintf(fp, "Router alert (IP header opt)       : %s\n", ENABLED(router_alert));
+		sscanf(buf, "dev %s port %s grp %s %s vid %d", dev, port, grp, flags, &vid);
+		fprintf(fp, "%-28s %4d %-*s %s\n", grp, vid, devw, dev, port);
+	}
 
-	return 0;
+	return pclose(pp);
 }
 
 static int show_version(FILE *fp)
@@ -472,9 +452,9 @@ static void ipc_handle(int sd, void *arg)
 	case IPC_VERSION:
 		ipc_show(client, show_version, cmd, sizeof(cmd));
 		break;
-#if 0
+
 	case IPC_IGMP_GRP:
-		ipc_show(client, show_igmp_groups, cmd, sizeof(cmd));
+		ipc_show(client, show_bridge_groups, cmd, sizeof(cmd));
 		break;
 
 	case IPC_IGMP_IFACE:
@@ -484,9 +464,9 @@ static void ipc_handle(int sd, void *arg)
 	case IPC_IGMP:
 		ipc_show(client, show_igmp, cmd, sizeof(cmd));
 		break;
-#endif
-	case IPC_IGMP:
-		ipc_show(client, show_igmp, cmd, sizeof(cmd));
+
+	case IPC_COMPAT:
+		ipc_show(client, show_bridge_compat, cmd, sizeof(cmd));
 		break;
 
 	case IPC_STATUS:
