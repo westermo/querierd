@@ -5,6 +5,7 @@
 #ifndef QUERIERD_IFACE_H_
 #define QUERIERD_IFACE_H_
 
+#include <net/if.h>
 #include <stdint.h>
 #include "queue.h"
 
