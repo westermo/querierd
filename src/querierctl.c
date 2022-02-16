@@ -331,7 +331,7 @@ static void print(char *line, int indent)
 
 	/* Table headings, or repeat headers, end with a '=' */
 	len = (int)strlen(line) - 1;
-	if (len > 0) {
+	if (len >= 0) {
 		if (line[len] == '_')
 			type = 1;
 		if (line[len] == '=')
@@ -347,6 +347,8 @@ static void print(char *line, int indent)
 	switch (type) {
 	case 1:
 		if (!plain) {
+			if (len == 0) /* skip empty lines in fancy output */
+				return;
 			fprintf(stdout, "\e[4m%*s\e[0m\n%s\n", get_width(), "", line);
 			return;
 
@@ -355,22 +357,25 @@ static void print(char *line, int indent)
 		len = len < 79 ? 79 : len;
 		for (i = 0; i < len; i++)
 			fputc('_', stdout);
-		fprintf(stdout, "\n%*s%s\n", indent, "", line);
+		fputs("\n", stdout);
+		if (line[0])
+			fprintf(stdout, "%*s%s\n", indent, "", line);
 		break;
 
 	case 2:
 		if (!plain) {
+			if (len == 0) /* skip empty lines in fancy output */
+				return;
 			len = get_width() - len;
 			fprintf(stdout, "\e[7m%s%*s\e[0m\n", line, len, "");
 			return;
 		}
 
 		len = len < 79 ? 79 : len;
+		if (line[0])
+			fprintf(stdout, "%*s%s\n", indent, "", line);
 		for (i = 0; i < len; i++)
-			fputc('=', stdout);
-		fprintf(stdout, "\n%*s%s\n", indent, "", line);
-		for (i = 0; i < len; i++)
-			fputc('=', stdout);
+			fputc('-', stdout);
 		fputs("\n", stdout);
 		break;
 
