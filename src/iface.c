@@ -441,6 +441,7 @@ void accept_membership_query(int ifindex, uint32_t src, uint32_t dst, uint32_t g
 	}
 
 	if (ntohl(src) < ntohl(cur)) {
+	  again:
 	    logit(LOG_DEBUG, 0, "New querier %s (was %s) on %s, timeout %d",
 		  inet_fmt(src, s1, sizeof(s1)), ifi->ifi_querier
 		  ? inet_fmt(ifi->ifi_querier->al_addr, s2, sizeof(s2)) : "me", ifi->ifi_name,
@@ -461,6 +462,15 @@ void accept_membership_query(int ifindex, uint32_t src, uint32_t dst, uint32_t g
 	    ifi->ifi_querier->al_addr = src;
 	    notnew = 0;
 	} else {
+	    if (!ifi->ifi_querier) {
+		/*
+		 * If we just "won" the election with a link-local
+		 * address, go back and fix.  We do not consider a
+		 * link-local address better than, e.g., a 192.168.
+		 */
+		if (IN_LINKLOCAL(ntohl(ifi->ifi_curr_addr)) && !IN_LINKLOCAL(ntohl(src)))
+		    goto again;
+	    }
 #if 0
 	    logit(LOG_DEBUG, 0, "Ignoring query from %s; querier on %s is still %s",
 		  inet_fmt(src, s1, sizeof(s1)), ifi->ifi_name,
