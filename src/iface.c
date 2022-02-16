@@ -399,6 +399,7 @@ static void query_groups(int period, void *arg)
 void accept_membership_query(int ifindex, uint32_t src, uint32_t dst, uint32_t group, int tmo, int ver)
 {
     struct ifi *ifi;
+    int notnew = 1;
 
     ifi = config_find_iface(ifindex);
     if (!ifi)
@@ -438,9 +439,10 @@ void accept_membership_query(int ifindex, uint32_t src, uint32_t dst, uint32_t g
 	}
 
 	if (ntohl(src) < ntohl(cur)) {
-	    logit(LOG_DEBUG, 0, "New querier %s (was %s) on %s",
+	    logit(LOG_DEBUG, 0, "New querier %s (was %s) on %s, timeout %d",
 		  inet_fmt(src, s1, sizeof(s1)), ifi->ifi_querier
-		  ? inet_fmt(ifi->ifi_querier->al_addr, s2, sizeof(s2)) : "me", ifi->ifi_name);
+		  ? inet_fmt(ifi->ifi_querier->al_addr, s2, sizeof(s2)) : "me", ifi->ifi_name,
+		  router_timeout);
 
 	    if (!ifi->ifi_querier) {
 		ifi->ifi_querier = calloc(1, sizeof(struct listaddr));
@@ -455,6 +457,7 @@ void accept_membership_query(int ifindex, uint32_t src, uint32_t dst, uint32_t g
 
 	    time(&ifi->ifi_querier->al_ctime);
 	    ifi->ifi_querier->al_addr = src;
+	    notnew = 0;
 	} else {
 #if 0
 	    logit(LOG_DEBUG, 0, "Ignoring query from %s; querier on %s is still %s",
@@ -468,8 +471,11 @@ void accept_membership_query(int ifindex, uint32_t src, uint32_t dst, uint32_t g
     /*
      * Reset the timer since we've received a query.
      */
-    if (ifi->ifi_querier && src == ifi->ifi_querier->al_addr)
+    if (notnew && ifi->ifi_querier && src == ifi->ifi_querier->al_addr) {
+	logit(LOG_DEBUG, 0, "Resetting query timeout %d sec", router_timeout);
 	pev_timer_set(ifi->ifi_querier->al_timerid, router_timeout * 1000000);
+	time(&ifi->ifi_querier->al_ctime);
+    }
 
     /*
      * If this is a Group-Specific query which we did not source,
