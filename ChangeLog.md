@@ -3,6 +3,23 @@ Change Log
 
 All relevant, user visible, changes are documented in this file.
 
+[v0.4][UNRELEASED] - 2022-02-16
+---------------------
+
+### Changes
+  - Support for adding/removing interfaces at runtime, with new test
+  - Add `querierctl` tool, with plain text API over UNIX domain socket
+    - Shows elected querier per VLAN, `querierctl show`
+	- Shows elected querier timeout
+	- Shows which port the elected querier is connected to on bridge
+    - Support for displaying `bridge mdb show` in human-friendly format
+
+### Fixes
+  - Fix rearming of internal timers, caused wrong querier timeout
+    handling and querierd jumping in too early
+  - Never allow link-local addresses to win a querier election
+  - Never allow 0.0.0.0 address to win a querier election
+
 
 [v0.3][] - 2022-02-08
 ---------------------
@@ -47,5 +64,6 @@ Limited IGMPv1/v2/v3 querier with hard-coded query interval, etc.  Put
 interfaces in a .conf file, whitespace separated to enable querier.
 
 [UNRELEASED]: https://github.com/westermo/querierd/compare/v0.3...HEAD
+[v0.4]:       https://github.com/westermo/querierd/compare/v0.3...v0.4
 [v0.3]:       https://github.com/westermo/querierd/compare/v0.2...v0.3
 [v0.2]:       https://github.com/westermo/querierd/compare/v0.1...v0.2
