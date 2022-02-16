@@ -121,18 +121,20 @@ void iface_check_election(struct ifi *ifi)
 	ifi->ifi_curr_addr = curr;
     }
 
-    if (ifi->ifi_querier) {
+    if (curr && ifi->ifi_querier) {
 	uint32_t cur = ifi->ifi_querier->al_addr;
 
 	if (ntohl(ifi->ifi_curr_addr) < ntohl(cur)) {
-	    logit(LOG_DEBUG, 0, "New local querier on %s", ifi->ifi_name);
+	    inet_fmt(cur, s1, sizeof(s1));
+	    logit(LOG_DEBUG, 0, "New local querier on %s, was %s (%u vs %u)",
+		  ifi->ifi_name, s1, ntohl(ifi->ifi_curr_addr), ntohl(cur));
 	    pev_timer_del(ifi->ifi_querier->al_timerid);
 	    free(ifi->ifi_querier);
 	    ifi->ifi_querier = NULL;
 	    goto elected;
 	}
     } else {
-	if (ifi->ifi_prev_addr == 0)
+	if (curr && ifi->ifi_prev_addr == 0)
 	    goto elected;
     }
 
