@@ -1,12 +1,6 @@
 Rough Plan for querierd
 =======================
 
-Planned for v0.4
-----------------
-
- - Write mini-HowTo: Setting up the Linux bridge with snooping per VLAN
-
-
 Planned for v1.0
 ----------------
 

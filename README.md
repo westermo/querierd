@@ -5,7 +5,15 @@ Bridge Querier Helper
 This daemon is a querier helper for the Linux bridge.  Currently IGMP
 (IPv4) is supported, MLD (IPv6) querier support is planned.
 
-Basic IPC support available:
+The daemon comes with a little helper tool called `querierctl` which
+can be used to check the status of IGMP per interface, but also to
+dump the bridge's MDB in a more human-friendly format.  There is a
+blog post describing how to set the bridge up and use `querierd`
+
+  * https://westermo.github.io/2022/02/17/bridge-igmp-snooping/
+
+For controlling `querierd` from another application, use the basic IPC
+support that `querierctl` employs:
 
     echo "help" |socat - UNIX-CONNECT:/run/querierd.sock
 
