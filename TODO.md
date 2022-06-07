@@ -1,6 +1,13 @@
 Rough Plan for querierd
 =======================
 
+Planned for v0.5
+----------------
+
+ - Look for better IP than 169 for each interface
+ - Add basic bridge per-VLAN setup instead of setupd
+
+
 Planned for v1.0
 ----------------
 
