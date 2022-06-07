@@ -44,11 +44,6 @@ void iface_init(void)
     config_iface_from_kernel();
 
     for (ifi = config_iface_iter(1); ifi; ifi = config_iface_iter(0)) {
-	if (ifi->ifi_flags & IFIF_DISABLED) {
-	    logit(LOG_INFO, 0, "%s is disabled; skipping", ifi->ifi_name);
-	    continue;
-	}
-
 	if (ifi->ifi_flags & IFIF_DOWN) {
 	    logit(LOG_INFO, 0, "%s is not yet up; skipping", ifi->ifi_name);
 	    continue;
@@ -333,7 +328,8 @@ static void start_iface(struct ifi *ifi)
     /*
      * Check if we should assume the querier role
      */
-    iface_check_election(ifi);
+    if (!(ifi->ifi_flags & IFIF_DISABLED))
+	iface_check_election(ifi);
 
     logit(LOG_INFO, 0, "Interface %s now in service", ifi->ifi_name);
 }
@@ -440,7 +436,7 @@ void accept_membership_query(int ifindex, uint32_t src, uint32_t dst, uint32_t g
 	    return;
 	}
 
-	if (ntohl(src) < ntohl(cur)) {
+	if (ntohl(src) < ntohl(cur) || !cur) {
 	  again:
 	    logit(LOG_DEBUG, 0, "New querier %s (was %s) on %s, timeout %d",
 		  inet_fmt(src, s1, sizeof(s1)), ifi->ifi_querier
