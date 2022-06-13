@@ -15,7 +15,7 @@ querierd_SOURCES  = main.c cfparse.y config.c defs.h	\
 		   igmp.c igmpv2.h igmpv3.h 		\
 		   inet.c ipc.c kern.c log.c 		\
 		   bridge.c pev.c pev.h			\
-		   pathnames.h queue.h
+		   pathnames.h queue.h bitstring.h
 querierd_CPPFLAGS = $(AM_CPPFLAGS)
 querierd_LDADD    = $(LIBS) $(LIBOBJS)
 
