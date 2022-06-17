@@ -82,19 +82,36 @@ void iface_zero(struct ifi *ifi)
     ifi->ifi_igmpv1_warn = 0;
 }
 
+static int iface_is_proxy(const struct ifi *ifi)
+{
+    return ifi->ifi_flags & IFIF_DISABLED;
+}
+
 /*
  * Restart IGMP Querier election
  *
  * Start by figuring out the best local address for the iface.  Check if
  * the current address is better (RFC), make sure an IPv4LL doesn't win.
  * Usually we want a real address if available.  0.0.0.0 is reserved for
- * proxy querys, which we cannot do on a plain UDP socket, and they must
- * never win an election.  (Proxy queries should be sent by the bridge.)
+ * proxy querys, which we resort to if proxy mode is active and no real
+ * querier has been seen.
  */
 void iface_check_election(struct ifi *ifi)
 {
     in_addr_t curr = 0;
     struct phaddr *pa;
+
+    if (iface_is_proxy(ifi)) {
+        if (ifi->ifi_querier && ifi->ifi_querier->al_addr)
+            return;
+
+        if (ifi->ifi_querier) {
+            pev_timer_del(ifi->ifi_querier->al_timerid);
+            free(ifi->ifi_querier);
+            ifi->ifi_querier = NULL;
+        }
+        goto elected;
+    }
 
     TAILQ_FOREACH(pa, &ifi->ifi_addrs, pa_link) {
 	in_addr_t cand = pa->pa_addr;
@@ -142,7 +159,8 @@ void iface_check_election(struct ifi *ifi)
      * the first query.
      */
     ifi->ifi_flags |= IFIF_QUERIER;
-    logit(LOG_DEBUG, 0, "Assuming querier duties on interface %s", ifi->ifi_name);
+    logit(LOG_DEBUG, 0, "Assuming %squerier duties on interface %s",
+          iface_is_proxy(ifi) ? "proxy " : "", ifi->ifi_name);
     send_query(ifi, allhosts_group, igmp_response_interval * IGMP_TIMER_SCALE, 0);
 }
 
@@ -269,19 +287,6 @@ static void send_query(struct ifi *ifi, uint32_t dst, int code, uint32_t group)
 {
     int datalen = 4;
 
-    if (!ifi->ifi_curr_addr) {
-	/*
-	 * If we send with source address 0.0.0.0 on a UDP socket the
-	 * kernel will go dumpster diving to find a "suitable" address
-	 * from another interface.  Obviously we don't want that ... we
-	 * would've liked to be able to send a proxy query, but that's
-	 * not possible unless SOCK_RAW, so we delegate the proxy query
-	 * mechanism to the bridge and bail out here.
-	 */
-//	logit(LOG_DEBUG, 0, "Skipping send of query on %s, no address yet.", ifi->ifi_name);
-	return;
-    }
-
     /*
      * IGMP version to send depends on the compatibility mode of the
      * interface:
@@ -297,13 +302,16 @@ static void send_query(struct ifi *ifi, uint32_t dst, int code, uint32_t group)
 	code = 0;
     }
 
-    logit(LOG_DEBUG, 0, "Sending %squery on %s",
+    logit(LOG_DEBUG, 0, "Sending %squery on %s src %s",
 	  (ifi->ifi_flags & IFIF_IGMPV1) ? "v1 " :
 	  (ifi->ifi_flags & IFIF_IGMPV2) ? "v2 " : "v3 ",
-	  ifi->ifi_name);
+	  ifi->ifi_name, inet_name(ifi->ifi_curr_addr, 1));
 
-    send_igmp(ifi->ifi_ifindex, ifi->ifi_curr_addr, dst, IGMP_MEMBERSHIP_QUERY,
-	      code, group, datalen);
+    if (ifi->ifi_curr_addr)
+        send_igmp(ifi->ifi_ifindex, ifi->ifi_curr_addr, dst, IGMP_MEMBERSHIP_QUERY,
+                  code, group, datalen);
+    else
+        send_igmp_proxy(ifi);
 }
 
 static void start_iface(struct ifi *ifi)
@@ -328,8 +336,7 @@ static void start_iface(struct ifi *ifi)
     /*
      * Check if we should assume the querier role
      */
-    if (!(ifi->ifi_flags & IFIF_DISABLED))
-	iface_check_election(ifi);
+    iface_check_election(ifi);
 
     logit(LOG_INFO, 0, "Interface %s now in service", ifi->ifi_name);
 }
@@ -382,7 +389,7 @@ static void query_groups(int period, void *arg)
 {
     struct ifi *ifi = (struct ifi *)arg;
 
-    if (ifi->ifi_flags & (IFIF_DOWN | IFIF_DISABLED))
+    if (ifi->ifi_flags & IFIF_DOWN)
 	return;
 
     if (ifi->ifi_flags & IFIF_QUERIER)

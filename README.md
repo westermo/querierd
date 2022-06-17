@@ -57,10 +57,9 @@ Description:
     however strongly recommended to leave this setting commented out!
 
 > **Note:** the daemon needs an address on interfaces to operate, it is
-> expected that querierd runs on top of a bridge, and that the bridge
-> takes care of per-VLAN proxy queries.  Also, currently the daemon does
-> not react automatically to IP address changes, so it needs to be
-> SIGHUP'ed to use any new interface or address.
+> expected that querierd runs on top of a bridge. Also, currently the
+> daemon does not react automatically to IP address changes, so it needs
+> to be SIGHUP'ed to use any new interface or address.
 
 
 Motivation

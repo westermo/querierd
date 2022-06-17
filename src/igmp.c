@@ -3,6 +3,9 @@
  * by the license in the accompanying file named "LICENSE".
  */
 
+#include <net/ethernet.h>
+#include <linux/if_packet.h>
+
 #include "defs.h"
 
 #define PIM_QUERY           0
@@ -20,6 +23,7 @@
 uint8_t		*recv_buf; 		     /* input packet buffer         */
 uint8_t		*send_buf; 		     /* output packet buffer        */
 int		igmp_socket;		     /* socket for all network I/O  */
+int		igmp_raw_pkt_socket;	     /* socket for ethernet frames  */
 int             router_alert;		     /* IP option Router Alert      */
 uint32_t        router_timeout;		     /* Other querier present intv. */
 uint32_t	igmp_query_interval;	     /* Default: 125 sec            */
@@ -34,11 +38,15 @@ uint32_t	allreports_group;	     /* IGMPv3 member reports       */
  * Private variables.
  */
 static int	igmp_sockid;
+static uint8_t	proxy_send_buf[IGMP_PROXY_QUERY_MAXLEN];
+static size_t	proxy_send_len;
 
 /*
  * Local function definitions.
  */
 static void	igmp_read(int sd, void *arg);
+static void	ipv4_set_static_fields(uint8_t *buf);
+static size_t	build_ipv4(uint8_t *buf, uint32_t src, uint32_t dst, short unsigned int datalen);
 
 /*
  * Open and initialize the igmp socket, and fill in the non-changing
@@ -48,8 +56,6 @@ void igmp_init(void)
 {
     const int BUFSZ = 256 * 1024;
     const int MINSZ =  48 * 1024;
-    struct ip *ip;
-    uint8_t *ip_opt;
 
     recv_buf = calloc(1, RECV_BUF_SIZE);
     send_buf = calloc(1, RECV_BUF_SIZE);
@@ -63,33 +69,14 @@ void igmp_init(void)
     if (igmp_socket < 0)
 	logit(LOG_ERR, errno, "Failed creating IGMP socket");
 
+    igmp_raw_pkt_socket = socket(AF_PACKET, SOCK_RAW, IPPROTO_RAW);
+    if (igmp_raw_pkt_socket < 0)
+	logit(LOG_ERR, errno, "Failed creating IGMP raw packet socket");
+
     k_hdr_include(1);		/* include IP header when sending */
     k_set_pktinfo(1);		/* ifindex in aux data on receive */
     k_set_rcvbuf(BUFSZ, MINSZ);	/* lots of input buffering        */
     k_set_ttl(1);		/* restrict multicasts to one hop */
-
-    /*
-     * Fields zeroed that aren't filled in later:
-     * - IP ID (let the kernel fill it in)
-     * - Offset (we don't send fragments)
-     * - Checksum (let the kernel fill it in)
-     */
-    ip         = (struct ip *)send_buf;
-    ip->ip_v   = IPVERSION;
-    ip->ip_hl  = IP_HEADER_RAOPT_LEN >> 2;
-    ip->ip_tos = 0xc0;		/* Internet Control */
-    ip->ip_ttl = MAXTTL;	/* applies to unicasts only */
-    ip->ip_p   = IPPROTO_IGMP;
-
-    /*
-     * RFC2113 IP Router Alert.  Per spec this is required to
-     * force certain routers/switches to inspect this frame.
-     */
-    ip_opt    = send_buf + sizeof(struct ip);
-    ip_opt[0] = IPOPT_RA;
-    ip_opt[1] = 4;
-    ip_opt[2] = 0;
-    ip_opt[3] = 0;
 
     allhosts_group   = htonl(INADDR_ALLHOSTS_GROUP);
     allrtrs_group    = htonl(INADDR_ALLRTRS_GROUP);
@@ -102,6 +89,13 @@ void igmp_init(void)
     router_timeout            = IGMP_OTHER_QUERIER_PRESENT_INTERVAL;
     router_alert              = 1;
 
+    ipv4_set_static_fields(send_buf);
+
+    ipv4_set_static_fields(proxy_send_buf + sizeof(struct ether_header));
+    proxy_send_len = sizeof(struct ether_header);
+    proxy_send_len += build_ipv4(proxy_send_buf + proxy_send_len, 0, allhosts_group, sizeof(struct igmp));
+    proxy_send_len += build_igmp(proxy_send_buf + proxy_send_len, 0, allhosts_group, IGMP_MEMBERSHIP_QUERY, 0, 0, 0);
+
     igmp_sockid = pev_sock_add(igmp_socket, igmp_read, NULL);
     if (igmp_sockid == -1)
 	logit(LOG_ERR, errno, "Failed registering IGMP handler");
@@ -110,6 +104,7 @@ void igmp_init(void)
 void igmp_exit(void)
 {
     pev_sock_del(igmp_sockid);
+    close(igmp_raw_pkt_socket);
     close(igmp_socket);
     free(recv_buf);
     free(send_buf);
@@ -271,6 +266,77 @@ void accept_igmp(int ifindex, size_t recvlen)
     }
 }
 
+static size_t build_ether_ipv4_mc(uint8_t *buf, const uint8_t *srcmac, uint32_t dst)
+{
+    struct ether_header *eh = (struct ether_header *)buf;
+
+    memset(eh, 0, sizeof(*eh));
+
+    memcpy(eh->ether_shost, srcmac, sizeof(eh->ether_shost));
+
+    eh->ether_dhost[0] = 0x01;
+    eh->ether_dhost[1] = 0x00;
+    eh->ether_dhost[2] = 0x5e;
+    eh->ether_dhost[3] = dst & 0x7f0000;
+    eh->ether_dhost[4] = dst & 0xff00;
+    eh->ether_dhost[5] = dst & 0xff;
+
+    eh->ether_type = htons(ETH_P_IP);
+
+    return sizeof(*eh);
+}
+
+static void ipv4_set_static_fields(uint8_t *buf)
+{
+    struct ip *ip;
+    uint8_t *ip_opt;
+
+    ip         = (struct ip *)buf;
+    ip->ip_v   = IPVERSION;
+    ip->ip_hl  = IP_HEADER_RAOPT_LEN >> 2;
+    ip->ip_tos = 0xc0;		/* Internet Control */
+    ip->ip_ttl = MAXTTL;	/* applies to unicasts only */
+    ip->ip_p   = IPPROTO_IGMP;
+
+    /*
+     * RFC2113 IP Router Alert.  Per spec this is required to
+     * force certain routers/switches to inspect this frame.
+     */
+    ip_opt    = buf + sizeof(struct ip);
+    ip_opt[0] = IPOPT_RA;
+    ip_opt[1] = 4;
+    ip_opt[2] = 0;
+    ip_opt[3] = 0;
+}
+
+static size_t build_ipv4(uint8_t *buf, uint32_t src, uint32_t dst, short unsigned int datalen)
+{
+    struct ip *ip = (struct ip *)(buf);
+    size_t len = IP_HEADER_RAOPT_LEN;
+
+    ip->ip_src.s_addr = src;
+    ip->ip_dst.s_addr = dst;
+    ip->ip_len        = htons(len + datalen);
+    if (IN_MULTICAST(ntohl(dst)))
+        ip->ip_ttl = curttl;
+    else
+        ip->ip_ttl = MAXTTL;
+
+    /*
+     *  We don't have anything unique to set this to - for proxy queries,
+     * for other queries the kernel will step in and replace zero values
+     * in the header anyway. It shouldn't be a problem even for proxy
+     * queries though since the packet size is so small that it should
+     * hardly be subject to fragmentation.
+     */
+    ip->ip_id = 0;
+
+    ip->ip_sum = 0;
+    ip->ip_sum = inet_cksum((uint16_t *)buf, len);
+
+    return len;
+}
+
 /*
  * RFC-3376 states that Max Resp Code (MRC) and Querier's Query Interval Code
  * (QQIC) should be presented in floating point value if their value exceeds
@@ -344,23 +410,13 @@ static inline uint8_t igmp_floating_point(unsigned int mantissa)
     return exponent | (mantissa & 0x0000000F);
 }
 
-size_t build_query(uint32_t src, uint32_t dst, int type, int code, uint32_t group, int datalen)
+size_t build_query(uint8_t *buf, uint32_t src, uint32_t dst, int type, int code, uint32_t group, int datalen)
 {
-    struct igmpv3_query *igmp;
+    struct igmpv3_query *igmp = (struct igmpv3_query *)buf;
     struct ip *ip;
     size_t igmp_len = IGMP_MINLEN + datalen;
     size_t len = IP_HEADER_RAOPT_LEN + igmp_len;
 
-    ip                = (struct ip *)send_buf;
-    ip->ip_src.s_addr = src;
-    ip->ip_dst.s_addr = dst;
-    ip->ip_len        = htons(len);
-    if (IN_MULTICAST(ntohl(dst)))
-	ip->ip_ttl    = curttl;
-    else
-	ip->ip_ttl    = MAXTTL;
-
-    igmp = (struct igmpv3_query *)(send_buf + IP_HEADER_RAOPT_LEN);
     memset(igmp, 0, sizeof(*igmp));
 
     igmp->type        = type;
@@ -386,30 +442,19 @@ size_t build_query(uint32_t src, uint32_t dst, int type, int code, uint32_t grou
  * Construct an IGMP message in the output packet buffer.  The caller may
  * have already placed data in that buffer, of length 'datalen'.
  */
-size_t build_igmp(uint32_t src, uint32_t dst, int type, int code, uint32_t group, int datalen)
+size_t build_igmp(uint8_t *buf, uint32_t src, uint32_t dst, int type, int code, uint32_t group, int datalen)
 {
-    struct ip *ip;
     struct igmp *igmp;
     size_t igmp_len = IGMP_MINLEN + datalen;
-    size_t len = IP_HEADER_RAOPT_LEN + IGMP_MINLEN + datalen;
 
-    ip                      = (struct ip *)send_buf;
-    ip->ip_src.s_addr       = src;
-    ip->ip_dst.s_addr       = dst;
-    ip->ip_len              = htons(len);
-    if (IN_MULTICAST(ntohl(dst)))
-	ip->ip_ttl = curttl;
-    else
-	ip->ip_ttl = MAXTTL;
-
-    igmp                    = (struct igmp *)(send_buf + IP_HEADER_RAOPT_LEN);
+    igmp                    = (struct igmp *)buf;
     igmp->igmp_type         = type;
     igmp->igmp_code         = code;
     igmp->igmp_group.s_addr = group;
     igmp->igmp_cksum        = 0;
     igmp->igmp_cksum        = inet_cksum((uint16_t *)igmp, igmp_len);
 
-    return len;
+    return igmp_len;
 }
 
 /*
@@ -421,17 +466,20 @@ void send_igmp(int ifindex, uint32_t src, uint32_t dst, int type, int code, uint
 {
     struct sockaddr_in sin;
     struct ip *ip;
-    size_t len;
+    size_t len = 0;
     int rc;
 
     /* Set IP header length,  router-alert is optional */
     ip        = (struct ip *)send_buf;
     ip->ip_hl = IP_HEADER_RAOPT_LEN >> 2;
 
+    len += build_ipv4(send_buf, src, dst, datalen);
+
     if (IGMP_MEMBERSHIP_QUERY == type)
-       len = build_query(src, dst, type, code, group, datalen);
-    else
-       len = build_igmp(src, dst, type, code, group, datalen);
+       len = build_query(send_buf + len, src, dst, type, code, group, datalen);
+    else {
+       len += build_igmp(send_buf + len, src, dst, type, code, group, datalen);
+    }
 
     /* For all IGMP, change egress interface (we have only one socket) */
     if (IN_MULTICAST(ntohl(dst)))
@@ -453,6 +501,28 @@ void send_igmp(int ifindex, uint32_t src, uint32_t dst, int type, int code, uint
     logit(LOG_DEBUG, 0, "SENT %s from %-15s to %s", igmp_packet_kind(type, code),
 	  src == INADDR_ANY ? "INADDR_ANY" : inet_fmt(src, s1, sizeof(s1)),
 	  inet_fmt(dst, s2, sizeof(s2)));
+}
+
+void send_igmp_proxy(const struct ifi *ifi)
+{
+    struct sockaddr_ll sa;
+    int rc;
+
+    /*
+     * The IP header and IGMP payload are static for proxy queries and have
+     * already been set when proxy_send_buf was initilized
+     */
+    build_ether_ipv4_mc(proxy_send_buf, ifi->ifi_hwaddr, INADDR_ALLHOSTS_GROUP);
+
+    sa.sll_ifindex = ifi->ifi_ifindex;
+    sa.sll_halen = ETH_ALEN;
+
+    rc = sendto(igmp_raw_pkt_socket, proxy_send_buf, proxy_send_len, 0, (struct sockaddr *)&sa, sizeof(sa));
+    if (rc < 0) {
+        logit(LOG_WARNING, errno, "sendto for proxy query failed");
+    }
+
+    logit(LOG_DEBUG, 0, "SENT proxy query from %s", ifi->ifi_name);
 }
 
 /**
