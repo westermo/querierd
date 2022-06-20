@@ -82,6 +82,11 @@ extern char		s2[MAX_INET_BUF_LEN];
 extern char		s3[MAX_INET_BUF_LEN];
 extern char		s4[MAX_INET_BUF_LEN];
 
+#define IGMP_PROXY_QUERY_MAXLEN (sizeof(struct ether_header)	+ \
+                                 sizeof(struct ip)		+ \
+                                 4 +				  \
+                                 IGMP_MINLEN)
+
 /*
  * Limit on length of route data
  */
@@ -145,8 +150,9 @@ extern void             resetlogging(void *);
 extern void		igmp_init(void);
 extern void		igmp_exit(void);
 extern void		accept_igmp(int, size_t);
-extern size_t		build_igmp(uint32_t, uint32_t, int, int, uint32_t, int);
+extern size_t		build_igmp(uint8_t *, uint32_t, uint32_t, int, int, uint32_t, int);
 extern void		send_igmp(int, uint32_t, uint32_t, int, int, uint32_t, int);
+extern void		send_igmp_proxy(const struct ifi *);
 extern char *		igmp_packet_kind(uint32_t, uint32_t);
 extern int		igmp_debug_kind(uint32_t, uint32_t);
 

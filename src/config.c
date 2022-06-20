@@ -76,6 +76,31 @@ struct ifi *config_find_iface(int ifindex)
     return NULL;
 }
 
+static int getmac(const char *ifname, uint8_t *mac, size_t size)
+{
+    struct ifreq ifr;
+    int rc = 0;
+    int sock;
+
+    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+        return 1;
+
+    ifr.ifr_addr.sa_family = AF_INET;
+    strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+
+    if (ioctl(sock, SIOCGIFHWADDR, &ifr) == -1) {
+        rc = 1;
+        goto done;
+    }
+
+    memcpy(mac, ifr.ifr_hwaddr.sa_data, size);
+
+done:
+    close(sock);
+
+    return rc;
+}
+
 /*
  * Called by parser to add an interface to start or watch for in the future
  */
@@ -105,6 +130,9 @@ struct ifi *config_iface_add(char *ifname)
 	ifi->ifi_ifindex = ifindex;
     else
 	ifi->ifi_flags |= IFIF_DOWN;
+
+    if (getmac(ifname, ifi->ifi_hwaddr, sizeof(ifi->ifi_hwaddr)))
+	logit(LOG_WARNING, errno, "failed finding hw address for iface %s", ifname);
 
     TAILQ_INSERT_TAIL(&ifaces, ifi, ifi_link);
 
