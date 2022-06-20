@@ -409,7 +409,6 @@ size_t build_query(uint8_t *buf, uint32_t src, uint32_t dst, int type, int code,
     struct igmpv3_query *igmp = (struct igmpv3_query *)buf;
     struct ip *ip;
     size_t igmp_len = IGMP_MINLEN + datalen;
-    size_t len = IP_HEADER_RAOPT_LEN + igmp_len;
 
     memset(igmp, 0, sizeof(*igmp));
 
@@ -429,7 +428,7 @@ size_t build_query(uint8_t *buf, uint32_t src, uint32_t dst, int type, int code,
     /* Note: calculate IGMP checksum last. */
     igmp->csum = inet_cksum((uint16_t *)igmp, igmp_len);
 
-    return len;
+    return igmp_len;
 }
 
 /*
@@ -470,7 +469,7 @@ void send_igmp(int ifindex, uint32_t src, uint32_t dst, int type, int code, uint
     len += build_ipv4(send_buf, src, dst, datalen);
 
     if (IGMP_MEMBERSHIP_QUERY == type)
-       len = build_query(send_buf + len, src, dst, type, code, group, datalen);
+       len += build_query(send_buf + len, src, dst, type, code, group, datalen);
     else {
        len += build_igmp(send_buf + len, src, dst, type, code, group, datalen);
     }
