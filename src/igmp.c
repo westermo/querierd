@@ -4,6 +4,7 @@
  */
 
 #include <net/ethernet.h>
+#include <netinet/if_ether.h>
 #include <linux/if_packet.h>
 
 #include "defs.h"
@@ -266,21 +267,14 @@ void accept_igmp(int ifindex, size_t recvlen)
     }
 }
 
-static size_t build_ether_ipv4_mc(uint8_t *buf, const uint8_t *srcmac, uint32_t dst)
+static size_t build_ether_ipv4_mc(uint8_t *buf, const uint8_t *srcmac, const uint32_t *dst)
 {
     struct ether_header *eh = (struct ether_header *)buf;
 
     memset(eh, 0, sizeof(*eh));
 
     memcpy(eh->ether_shost, srcmac, sizeof(eh->ether_shost));
-
-    eh->ether_dhost[0] = 0x01;
-    eh->ether_dhost[1] = 0x00;
-    eh->ether_dhost[2] = 0x5e;
-    eh->ether_dhost[3] = dst & 0x7f0000;
-    eh->ether_dhost[4] = dst & 0xff00;
-    eh->ether_dhost[5] = dst & 0xff;
-
+    ETHER_MAP_IP_MULTICAST(dst, eh->ether_dhost);
     eh->ether_type = htons(ETH_P_IP);
 
     return sizeof(*eh);
@@ -512,7 +506,7 @@ void send_igmp_proxy(const struct ifi *ifi)
      * The IP header and IGMP payload are static for proxy queries and have
      * already been set when proxy_send_buf was initilized
      */
-    build_ether_ipv4_mc(proxy_send_buf, ifi->ifi_hwaddr, INADDR_ALLHOSTS_GROUP);
+    build_ether_ipv4_mc(proxy_send_buf, ifi->ifi_hwaddr, &allhosts_group);
 
     sa.sll_ifindex = ifi->ifi_ifindex;
     sa.sll_halen = ETH_ALEN;
