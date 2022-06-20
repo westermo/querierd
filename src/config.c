@@ -85,7 +85,7 @@ static int getmac(const char *ifname, uint8_t *mac, size_t size)
         return 1;
 
     ifr.ifr_addr.sa_family = AF_INET;
-    strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
+    strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 
     ioctl(sock, SIOCGIFHWADDR, &ifr);
 
