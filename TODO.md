@@ -1,7 +1,7 @@
 Rough Plan for querierd
 =======================
 
-Planned for v0.5
+Planned for v0.6
 ----------------
 
  - Look for better IP than 169 for each interface

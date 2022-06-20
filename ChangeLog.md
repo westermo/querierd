@@ -3,6 +3,18 @@ Change Log
 
 All relevant, user visible, changes are documented in this file.
 
+[v0.5][UNRELEASED] - 2022-06-20
+---------------------
+
+### Changes
+  - Add per interface proxy mode
+     - Any interface listed as disabled in configuration is considered a
+       proxy interface
+     - Proxy queries (with source 0.0.0.0) are sent until a real querier is
+       detected
+     - querierctl shows elected querier for proxy interfaces
+  - querierctl: Support for displaying discovered router ports
+
 [v0.4][] - 2022-02-16
 ---------------------
 
@@ -64,6 +76,7 @@ Limited IGMPv1/v2/v3 querier with hard-coded query interval, etc.  Put
 interfaces in a .conf file, whitespace separated to enable querier.
 
 [UNRELEASED]: https://github.com/westermo/querierd/compare/v0.4...HEAD
+[v0.5]:       https://github.com/westermo/querierd/compare/v0.4...v0.5
 [v0.4]:       https://github.com/westermo/querierd/compare/v0.3...v0.4
 [v0.3]:       https://github.com/westermo/querierd/compare/v0.2...v0.3
 [v0.2]:       https://github.com/westermo/querierd/compare/v0.1...v0.2
