@@ -22,7 +22,6 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <netinet/if_ether.h>
-#include "bitstring.h"
 #include "defs.h"
 #include "queue.h"
 
@@ -208,56 +207,74 @@ void bridge_prop(FILE *fp, char *prop, int setval)
 	fprintf(fp, "\n");
 }
 
+/*
+ * Parse output from bridge -s -json vlan global:
+ * > bridge -s -json vlan global show br0 | jq
+ * [
+ *   {
+ *     "ifname": "br0",
+ *     "vlans": [
+ *       {
+ *         "vlan": 1,
+ *         ...
+ *         "router_ports": [
+ *           {
+ *             "port": "eth0",
+ *             "timer": "  29.01",
+ *             "type": "temp"
+ *           }
+ *         ]
+ *       },
+ *       {
+ *         "vlan": 2,
+ *         ...
+ *         "router_ports": [
+ *           {
+ *             "port": "eth1",
+ *             "timer": "  19.04",
+ *             "type": "temp"
+ *           }
+ *         ]
+ *       }
+ *     ]
+ *   }
+ * ]
+ */
 void bridge_router_ports(FILE *fp)
 {
-	char cmd[80], buf[80];
-	FILE *rfp;
+	static const char *bridge_args = "-json -s vlan global show dev";
+	static const char *jq_filter = ".[].vlans[].router_ports[] | " \
+				       ".port + \" \" + .timer + \" \" + .type";
+	char prev_ifname[20] = { 0 };
+	char cmd[256], buf[80];
 	int num = 0;
-	int in_rport_context = 0;
+	FILE *rfp;
 	int ret;
-	bitstr_t bit_decl(seen, CHAR_BIT * sizeof(unsigned long));
 
-	ret = snprintf(cmd, sizeof(cmd), "bridge -s vlan global show dev %s", br);
+	ret = snprintf(cmd, sizeof(cmd), "bridge %s %s | jq -r '%s' | sort",
+		       bridge_args, br, jq_filter);
 	if (ret < 0 || ret >= (int)sizeof(cmd))
 		goto fail;
 	rfp = popen(cmd, "r");
 	if (!rfp)
 		goto fail;
 
-	/*
-	 * Parse output from bridge -s vlan global:
-	 * > bridge -s vlan global show br0
-	 * port              vlan-id
-	 * br0               1
-	 *                     mcast_snooping 1 mcast_querier 1 ...
-	 *                     router ports: eth2     0.00 temp
-	 *                                   eth1    29.01 temp
-	 *                   2
-	 *                     mcast_snooping 1 mcast_querier 1 ...
-	 *                     router ports: eth2    19.04 temp
-	 */
 	while (fgets(buf, sizeof(buf), rfp)) {
-		const char *fmt;
 		char ifname[20];
+		int seen = 0;
 		float timer;
 
-		if (in_rport_context)
-			fmt = " %19s %2f temp";
-		else
-			fmt = " router ports: %19s %2f temp";
+		if (sscanf(buf, "%19s %2f temp", ifname, &timer) != 2)
+			continue;
 
-		if (sscanf(buf, fmt, ifname, &timer) == 2) {
-			unsigned int ifi = if_nametoindex(ifname);
+		seen = prev_ifname[0] && !strncmp(ifname, prev_ifname, sizeof(ifname));
 
-			logit(LOG_DEBUG, 0, "Found router port %s (%lu) with %.2f s timeout\n", ifname, ifi, timer);
-			if (timer > 0.0 && ifi && !bit_test(seen, ifi)) {
-				fprintf(fp, "%s%s", num ? ", " : "", ifname);
-				num++;
-				bit_set(seen, ifi);
-			}
-			in_rport_context = 1;
-		} else
-			in_rport_context = 0;
+		logit(LOG_DEBUG, 0, "Found router port %s with %.2f s timeout\n", ifname, timer);
+		if (timer > 0.0 && !seen) {
+			fprintf(fp, "%s%s", num ? ", " : "", ifname);
+			num++;
+			memcpy(prev_ifname, ifname, sizeof(prev_ifname));
+		}
 	}
 	pclose(rfp);
 
