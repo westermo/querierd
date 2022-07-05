@@ -3,6 +3,12 @@ Change Log
 
 All relevant, user visible, changes are documented in this file.
 
+[v0.6][UNRELEASED] - 2022-07-05
+---------------------
+
+### Fixes
+  - querierctl: Fix handling of bigger interface indexes in router port parsing
+
 [v0.5][] - 2022-06-20
 ---------------------
 
@@ -76,6 +82,7 @@ Limited IGMPv1/v2/v3 querier with hard-coded query interval, etc.  Put
 interfaces in a .conf file, whitespace separated to enable querier.
 
 [UNRELEASED]: https://github.com/westermo/querierd/compare/v0.5...HEAD
+[v0.6]:       https://github.com/westermo/querierd/compare/v0.5...v0.6
 [v0.5]:       https://github.com/westermo/querierd/compare/v0.4...v0.5
 [v0.4]:       https://github.com/westermo/querierd/compare/v0.3...v0.4
 [v0.3]:       https://github.com/westermo/querierd/compare/v0.2...v0.3
