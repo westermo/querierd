@@ -3,6 +3,13 @@ Change Log
 
 All relevant, user visible, changes are documented in this file.
 
+[v0.7][UNRELEASED] - 2022-10-10
+---------------------
+
+### Fixes
+  - Fix use-after-free on machines with unsigned-by-default chars
+  - Fix incorrect VID parsing of MDB entries
+
 [v0.6][] - 2022-07-05
 ---------------------
 
