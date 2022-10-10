@@ -98,10 +98,28 @@ static int populate(void)
 		return -1;
 
 	while (fgets(buf, sizeof(buf), fp)) {
-		char br[5], port[16], group[64], opt[10];
-		int vid, n;
+		char br[5], port[16], group[64];
+		char *tok, *dst;
+		int vid = 0;
 
-		n = sscanf(buf, "dev %s port %s grp %s %s vid %d", br, port, group, opt, &vid);
+		for (tok = strtok(buf, " \t"); tok; tok = strtok(NULL, " \t")) {
+			if (!strcmp(tok, "dev")) {
+				dst = br;
+			} else if (!strcmp(tok, "port")) {
+				dst = port;
+			} else if (!strcmp(tok, "grp")) {
+				dst = group;
+			} else if (!strcmp(tok, "vid")) {
+				tok = strtok(NULL, " \t");
+				vid = strtol(tok, NULL, 10);
+				continue;
+			} else {
+				continue;
+			}
+
+			tok = strtok(NULL, " \t");
+			strcpy(dst, tok);
+		}
 
 		/* XXX: Filter out IPv6 and MAC for now ... */
 		if (strchr(group, ':'))
