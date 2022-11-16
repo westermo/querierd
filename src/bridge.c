@@ -211,15 +211,71 @@ static char *got(char *prop, int setval, int first)
 	return NULL;
 }
 
+ static int cmpstringp(const void *p1, const void *p2)
+{
+
+	const char *str1 = *(const char **)p1;
+	const char *str2 = *(const char **)p2;
+
+	int length = 0;
+	int index = 0;
+	int str1_len = strlen(str1);
+	int str2_len = strlen(str2);
+
+	if (str1_len == str2_len) {
+		length = str1_len;
+		return strncmp(str1, str2, length);
+	}
+	else if (str1_len > str2_len) 
+		length = str1_len;
+	else 
+		length = str2_len;
+	
+	for (index=0; index<=length; index++) {
+		if (*str1 != *str2)
+			break;
+
+		str1++;
+		str2++;
+	}
+
+	if (index <= 2)
+		return strncmp(str1, str2, length);
+	else if (str1_len < str2_len)
+		return -1;
+	else
+		return 1;
+
+
+}
+
 void bridge_prop(FILE *fp, char *prop, int setval)
 {
 	char *ifname;
 	int num = 0;
-
+	char **array = malloc(0);
+	
 	while ((ifname = got(prop, setval, !num))) {
-		fprintf(fp, "%s%s", num ? ", " : "", ifname);
+		array = realloc(array, (num + 1) * sizeof(char *));
+		array[num] = malloc((strlen(ifname) + 1) * sizeof(char));
+		strcpy(array[num], ifname);
 		num++;
 	}
+	
+	qsort(array, num, sizeof(char *), cmpstringp);
+
+	for (int i=0; i<num; i++) {
+		logit(LOG_DEBUG, 0, "Array val: %s, index: %d", array[i], i);
+		fprintf(fp, "%s%s", i ? ", " : "", array[i]);
+	}
+
+	for (int j=0; j<num; j++)
+	{
+		free(array[j]);
+	}
+
+	free(array);
+
 	if (!num && compat)
 		fprintf(fp, "---");
 	fprintf(fp, "\n");
@@ -261,19 +317,23 @@ void bridge_prop(FILE *fp, char *prop, int setval)
 void bridge_router_ports(FILE *fp)
 {
 	static const char *bridge_args = "-json -s vlan global show dev";
-	static const char *jq_filter = ".[].vlans[].router_ports[] | " \
-				       ".port + \" \" + .timer + \" \" + .type";
+	static const char *jq_filter = ".[].vlans[] | " \
+				       "if has(\"router_ports\") == true then .router_ports[].port + \" \" + " \
+					   ".router_ports[].timer + \" \" + .router_ports[].type else \"false\" end";
 	char prev_ifname[20] = { 0 };
-	char cmd[256], buf[80];
+	char cmd[300], buf[80];
 	int num = 0;
 	FILE *rfp;
 	int ret;
 
 	ret = snprintf(cmd, sizeof(cmd), "bridge %s %s | jq -r '%s' | sort",
 		       bridge_args, br, jq_filter);
+
 	if (ret < 0 || ret >= (int)sizeof(cmd))
 		goto fail;
+	
 	rfp = popen(cmd, "r");
+
 	if (!rfp)
 		goto fail;
 

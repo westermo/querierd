@@ -265,7 +265,9 @@ static int ipc_ping(void)
 
 static int get_width(void)
 {
-	int ret = 79;
+	/* Max width for highlighted lines. */
+	int max_width = 78;
+	int ret = max_width;
 #ifdef HAVE_TERMIOS_H
 	struct pollfd fd = { STDIN_FILENO, POLLIN, 0 };
 	struct termios tc, saved;
@@ -273,14 +275,21 @@ static int get_width(void)
 	char buf[42];
 
 	if (!ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws)) {
-		return ws.ws_col;
+		if (ws.ws_col > 0 && ws.ws_col <= max_width)
+			return ws.ws_col;
+		else if (ws.ws_col > max_width)
+			return max_width;
+
 	} else if (!isatty(STDOUT_FILENO)) {
 		char *columns;
 
 		/* we may be running under watch(1) */
 		columns = getenv("COLUMNS");
 		if (columns)
-			return atoi(columns);
+			ret = atoi(columns);
+
+		if (ret > max_width)
+			ret = max_width;
 
 		return ret;
 	}
@@ -303,6 +312,10 @@ static int get_width(void)
 	fprintf(stderr, "\e8");
 	tcsetattr(STDERR_FILENO, TCSANOW, &saved);
 #endif
+
+	if (ret > max_width)
+		ret = max_width;
+
 	return ret;
 }
 
@@ -326,6 +339,8 @@ static void print(char *line, int indent)
 {
 	int type = 0;
 	int i, len;
+	int index = 0;
+	int str_len;
 
 	chomp(line);
 
@@ -380,7 +395,24 @@ static void print(char *line, int indent)
 		break;
 
 	default:
-		puts(line);
+		str_len = strlen(line);
+		len = 79;
+
+		if (str_len > len) {
+			for (int x=0; x <= str_len; x++) {
+				fputc(line[0], stdout);
+				
+				if (index >= len && line[0] == ' ') {
+					index = 0;
+					fprintf(stdout, "\n\t\t\t");
+					index = 24;
+				}
+				line++;
+				index++;
+			}
+		}
+		else
+			puts(line);
 		break;
 	}
 }
