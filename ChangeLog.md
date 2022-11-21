@@ -3,6 +3,13 @@ Change Log
 
 All relevant, user visible, changes are documented in this file.
 
+[v0.8][] - 2022-11-21
+---------------------
+
+### Fixes
+  - Fix ports not sorted when running querierctl
+  - Fix router ports not showing if vlan doesn't have router port
+
 [v0.7][] - 2022-10-10
 ---------------------
 
