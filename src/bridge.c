@@ -27,6 +27,13 @@
 
 #define SYSFS_PATH_ "/sys/class/net/"
 
+struct port_name {
+	TAILQ_ENTRY(port_name) link;
+	char ifname[IFNAMSIZ];
+};
+TAILQ_HEAD(port_name_list, port_name); 
+struct port_name_list pnl = TAILQ_HEAD_INITIALIZER(pnl);
+
 struct mdb {
 	TAILQ_ENTRY(mdb) link;
 
@@ -35,6 +42,7 @@ struct mdb {
 	char port[128];		/* XXX: too small prob */
 	int  vid;
 };
+
 
 TAILQ_HEAD(, mdb) mdb_list = TAILQ_HEAD_INITIALIZER(mdb_list);
 static char *br   = "br0";
@@ -252,16 +260,40 @@ static char *got(char *prop, int setval, int first)
 void bridge_prop(FILE *fp, char *prop, int setval)
 {
 	char *ifname;
+	char **array = NULL;
 	int num = 0;
-	char **array = malloc(0);
-	
+	int x = 0;
+	struct port_name *name = NULL, *next = NULL;		
+
 	while ((ifname = got(prop, setval, !num))) {
-		array = realloc(array, (num + 1) * sizeof(char *));
-		array[num] = malloc((strlen(ifname) + 1) * sizeof(char));
-		strcpy(array[num], ifname);
+
+		name = malloc(sizeof(struct port_name));
+		if (!name)
+			goto out;
+		strncpy(name->ifname, ifname, IFNAMSIZ);
+		logit(LOG_DEBUG, 0, "Loop, name %s", name->ifname);
+
+		TAILQ_INSERT_TAIL(&pnl, name, link);	
 		num++;
+		name = NULL;
+	}
+
+	array = malloc(num * sizeof(char*));
+	if (!array)
+		goto out;
+
+	for(int j=0; j<num; j++) {
+		array[j] = malloc(IFNAMSIZ * sizeof(char));
+		if (!array[j])
+			goto out;
 	}
 	
+	TAILQ_FOREACH(name, &pnl, link) {
+		logit(LOG_DEBUG, 0, "Foreach, port name: %s", name->ifname);
+		strncpy(array[x], name->ifname, IFNAMSIZ);
+		x++;
+	}
+
 	qsort(array, num, sizeof(char *), cmpstringp);
 
 	for (int i=0; i<num; i++) {
@@ -269,12 +301,23 @@ void bridge_prop(FILE *fp, char *prop, int setval)
 		fprintf(fp, "%s%s", i ? ", " : "", array[i]);
 	}
 
-	for (int j=0; j<num; j++)
-	{
-		free(array[j]);
+out:
+	/* Cleaning up */
+	if (array) {
+		for (int j=0; j<num; j++)
+		{
+			if (array[j]) 
+				free(array[j]);
+		}
+
+		free(array);
 	}
 
-	free(array);
+	for (name = TAILQ_FIRST(&pnl); name; name = next) {
+	    next = TAILQ_NEXT(name, link);
+        TAILQ_REMOVE(&pnl, name, link);
+		free(name);
+	}
 
 	if (!num && compat)
 		fprintf(fp, "---");
