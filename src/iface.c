@@ -954,7 +954,7 @@ static void delete_group_cb(int timeout, void *arg)
 
     ifi = config_find_iface(cbk->ifindex);
     if (!ifi)
-	goto done;
+	return;
 
     logit(LOG_DEBUG, 0, "Group membership timeout for %s on %s",
 	  inet_fmt(cbk->g->al_addr, s1, sizeof(s1)), ifi->ifi_name);
@@ -969,8 +969,6 @@ static void delete_group_cb(int timeout, void *arg)
 
     TAILQ_REMOVE(&ifi->ifi_groups, g, al_link);
     free(g);
-  done:
-    free(cbk);
 }
 
 /*
@@ -979,7 +977,9 @@ static void delete_group_cb(int timeout, void *arg)
 static int delete_group_timer(int ifindex, struct listaddr *g, int tmo)
 {
     cbk_t *cbk;
+    int tid;
 
+    /* cbk is freed as a side effect of pev_timer_del (via the deletion cb) */
     cbk = calloc(1, sizeof(cbk_t));
     if (!cbk) {
 	logit(LOG_ERR, errno, "%s(): Failed allocating memory", __func__);
@@ -992,7 +992,10 @@ static int delete_group_timer(int ifindex, struct listaddr *g, int tmo)
     /* Record mtime for IPC "show igmp" */
 //    g->al_mtime = virtual_time;
 
-    return pev_timer_add(tmo * 1000000, 0, delete_group_cb, cbk);
+    tid = pev_timer_add(tmo * 1000000, 0, delete_group_cb, cbk);
+    pev_timer_set_cb_del(tid, free);
+
+    return tid;
 }
 
 /*
