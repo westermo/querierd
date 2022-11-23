@@ -53,6 +53,8 @@ typedef void (*ihfunc_t) (int);
 
 #define NELEMS(a)	(sizeof((a)) / sizeof((a)[0]))
 
+TAILQ_HEAD(ifaces, ifi);
+
 /*
  * External declarations for global variables and functions.
  */
