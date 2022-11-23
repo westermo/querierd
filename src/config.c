@@ -9,7 +9,7 @@
 /*
  * Exported variables.
  */
-TAILQ_HEAD(ifaces, ifi) ifaces = TAILQ_HEAD_INITIALIZER(ifaces);
+struct ifaces ifaces = TAILQ_HEAD_INITIALIZER(ifaces);
 
 void config_set_ifflag(uint32_t flag)
 {

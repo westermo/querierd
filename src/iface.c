@@ -15,6 +15,8 @@ typedef struct {
     int    num;
 } cbk_t;
 
+extern struct ifaces ifaces;
+
 /*
  * Forward declarations.
  */
@@ -34,7 +36,6 @@ static int  send_query_timer   (int ifindex, struct listaddr *g, int delay, int 
 
 static void group_version_cb   (int timeout, void *arg);
 static int  group_version_timer(int ifindex, struct listaddr *g);
-
 
 void iface_init(void)
 {
@@ -57,12 +58,19 @@ void iface_init(void)
 void iface_exit(void)
 {
     struct listaddr *a, *tmp;
-    struct phaddr *pa, *pat;
-    struct ifi *ifi;
+    struct ifi *ifi, *ifi_tmp;
 
-    for (ifi = config_iface_iter(1); ifi; ifi = config_iface_iter(0)) {
-	iface_del(ifi->ifi_ifindex, 0);
-	free(ifi);
+	/* Deletes the entire list and all sub-lists. */
+	TAILQ_FOREACH_SAFE(ifi, &ifaces, ifi_link, ifi_tmp) { 
+	
+		iface_del(ifi->ifi_ifindex, 0);
+
+	    TAILQ_FOREACH_SAFE(a, &ifi->ifi_static, al_link, tmp) {
+			TAILQ_REMOVE(&ifi->ifi_static, a, al_link);
+			free(a);
+		}
+		TAILQ_REMOVE(&ifaces, ifi, ifi_link);
+		free(ifi);
     }
 }
 
