@@ -1,5 +1,5 @@
 AC_PREREQ(2.61)
-AC_INIT([querierd], [0.8], [https://github.com/troglobit/querierd/issues],,
+AC_INIT([querierd], [0.9], [https://github.com/troglobit/querierd/issues],,
 		[https://troglobit.com/projects/querierd/])
 AC_CONFIG_AUX_DIR(aux)
 AM_INIT_AUTOMAKE([1.11 foreign])

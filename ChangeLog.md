@@ -3,6 +3,13 @@ Change Log
 
 All relevant, user visible, changes are documented in this file.
 
+[v0.9][] - 2022-11-24
+---------------------
+
+### Fixes
+  - Fix memory leak in join handler
+  - Fix issue with elements not being removed correctly with TIALQ
+
 [v0.8][] - 2022-11-21
 ---------------------
 
