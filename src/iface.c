@@ -92,7 +92,7 @@ void iface_zero(struct ifi *ifi)
 
 static int iface_is_proxy(const struct ifi *ifi)
 {
-    return ifi->ifi_flags & IFIF_DISABLED;
+    return ifi->ifi_flags & IFIF_PROXY_QUERIES;
 }
 
 /*
@@ -344,7 +344,8 @@ static void start_iface(struct ifi *ifi)
     /*
      * Check if we should assume the querier role
      */
-    iface_check_election(ifi);
+    if (!(ifi->ifi_flags & IFIF_DISABLED))
+        iface_check_election(ifi);
 
     logit(LOG_INFO, 0, "Interface %s now in service", ifi->ifi_name);
 }
@@ -397,7 +398,7 @@ static void query_groups(int period, void *arg)
 {
     struct ifi *ifi = (struct ifi *)arg;
 
-    if (ifi->ifi_flags & IFIF_DOWN)
+    if (ifi->ifi_flags & (IFIF_DOWN | IFIF_DISABLED))
 	return;
 
     if (ifi->ifi_flags & IFIF_QUERIER)

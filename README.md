@@ -35,7 +35,7 @@ version.
     robustness [2-10]                         # default: 2
     router-timeout [10-1024]                  # default: 255 sec
     
-    iface IFNAME [enable] [igmpv2 | igmpv3]   # default: disable
+    iface IFNAME [enable] [proxy-queries] [igmpv2 | igmpv3]   # default: disable
 
 Description:
 

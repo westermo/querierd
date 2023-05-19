@@ -30,6 +30,7 @@ struct ifi {
 #define IFIF_QUERIER		0x000400 /* I am the subnet's querier */
 #define IFIF_IGMPV1		0x000800 /* Act as an IGMPv1 Router   */
 #define IFIF_IGMPV2		0x001000 /* Act as an IGMPv2 Router   */
+#define IFIF_PROXY_QUERIES	0x002000 /* Enable proxy queries      */
 
 struct phaddr {
     TAILQ_ENTRY(phaddr) pa_link;
