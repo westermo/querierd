@@ -3,6 +3,12 @@ Change Log
 
 All relevant, user visible, changes are documented in this file.
 
+[v0.10][UNRELEASED] - 2023-05-30
+----------------------
+
+### Changes
+  - Add new passive mode, where no queries are sent
+
 [v0.9][] - 2022-11-24
 ---------------------
 
@@ -102,8 +108,10 @@ Initial public release.
 Limited IGMPv1/v2/v3 querier with hard-coded query interval, etc.  Put
 interfaces in a .conf file, whitespace separated to enable querier.
 
-[UNRELEASED]: https://github.com/westermo/querierd/compare/v0.7...HEAD
-[v0.7]:       https://github.com/westermo/querierd/compare/v0.7...HEAD
+[UNRELEASED]: https://github.com/westermo/querierd/compare/v0.9...HEAD
+[v0.9]:       https://github.com/westermo/querierd/compare/v0.8...v0.9
+[v0.8]:       https://github.com/westermo/querierd/compare/v0.7...v0.8
+[v0.7]:       https://github.com/westermo/querierd/compare/v0.6...v0.7
 [v0.6]:       https://github.com/westermo/querierd/compare/v0.5...v0.6
 [v0.5]:       https://github.com/westermo/querierd/compare/v0.4...v0.5
 [v0.4]:       https://github.com/westermo/querierd/compare/v0.3...v0.4
