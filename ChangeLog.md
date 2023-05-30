@@ -3,7 +3,7 @@ Change Log
 
 All relevant, user visible, changes are documented in this file.
 
-[v0.10][UNRELEASED] - 2023-05-30
+[v0.10][] - 2023-05-30
 ----------------------
 
 ### Changes
@@ -108,7 +108,8 @@ Initial public release.
 Limited IGMPv1/v2/v3 querier with hard-coded query interval, etc.  Put
 interfaces in a .conf file, whitespace separated to enable querier.
 
-[UNRELEASED]: https://github.com/westermo/querierd/compare/v0.9...HEAD
+[UNRELEASED]: https://github.com/westermo/querierd/compare/v0.10...HEAD
+[v0.10]:      https://github.com/westermo/querierd/compare/v0.9...v0.10
 [v0.9]:       https://github.com/westermo/querierd/compare/v0.8...v0.9
 [v0.8]:       https://github.com/westermo/querierd/compare/v0.7...v0.8
 [v0.7]:       https://github.com/westermo/querierd/compare/v0.6...v0.7
